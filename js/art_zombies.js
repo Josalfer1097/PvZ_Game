@@ -4,7 +4,7 @@
 //  hombros, codos, cabeza con retraso y mandíbula móvil).
 // =====================================================================
 (() => {
-  const { TAU, C, rg, lg, fs, circle, ell, rrect, line, highlight, setTint } = Art;
+  const { TAU, C, rg, lg, fs, circle, ell, rrect, line, highlight, setTint, crescent } = Art;
   const ZO = '#221d18'; // contorno
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const pickR = (arr, r) => arr[Math.floor(r * arr.length) % arr.length];
@@ -137,13 +137,32 @@
     ctx.fillRect(-12, -2, 3.5, 3.5); ctx.fillRect(-4, -2, 3, 3); ctx.fillRect(4, -2, 3.5, 3);
     ctx.restore();
     // cráneo
-    ctx.beginPath();
-    ctx.moveTo(-26, -2);
-    ctx.bezierCurveTo(-30, -36, 18, -44, 26, -14);
-    ctx.bezierCurveTo(30, 2, 22, 12, 12, 13);
-    ctx.lineTo(-18, 12);
-    ctx.quadraticCurveTo(-27, 8, -26, -2); ctx.closePath();
+    const skull = () => {
+      ctx.beginPath();
+      ctx.moveTo(-26, -2);
+      ctx.bezierCurveTo(-30, -36, 18, -44, 26, -14);
+      ctx.bezierCurveTo(30, 2, 22, 12, 12, 13);
+      ctx.lineTo(-18, 12);
+      ctx.quadraticCurveTo(-27, 8, -26, -2); ctx.closePath();
+    };
+    skull();
     fs(ctx, rg(ctx, -6, -14, 34, skin[0], skin[1]), ZO, 3);
+    skull(); ctx.save(); ctx.clip();
+    // sombra propia (volumen) y manchas de descomposición
+    ctx.beginPath(); ctx.rect(-40, -50, 80, 70); ctx.ellipse(-6, -18, 30, 28, 0, 0, TAU);
+    ctx.fillStyle = 'rgba(20,30,10,0.22)'; ctx.fill('evenodd');
+    ctx.fillStyle = 'rgba(70,90,40,0.28)';
+    ell(ctx, 10, -26, 6, 4, 0.4); ctx.fill(); ell(ctx, -20, -20, 4, 3); ctx.fill(); ell(ctx, 16, 2, 3, 2.5); ctx.fill();
+    ctx.fillStyle = 'rgba(120,40,40,0.18)'; ell(ctx, -16, 4, 6, 3); ctx.fill();
+    if (type === 'mummy' || type === 'pharaoh') {
+      ctx.strokeStyle = C('#e6dcb8'); ctx.lineWidth = 7;
+      for (const [y, a] of [[-30, -0.15], [-20, 0.12], [-2, -0.08], [8, 0.1]]) { ctx.save(); ctx.translate(0, y); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(-34, 0); ctx.lineTo(34, 0); ctx.stroke(); ctx.restore(); }
+      ctx.strokeStyle = 'rgba(120,100,60,0.5)'; ctx.lineWidth = 1;
+      for (const y of [-33, -27, -23, -17, -5, 1, 5, 11]) { ctx.beginPath(); ctx.moveTo(-34, y); ctx.lineTo(34, y + 1); ctx.stroke(); }
+    }
+    ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.ellipse(-4, -14, 24, 22, 0, 3.5, 4.5);
+    ctx.strokeStyle = 'rgba(255,255,230,0.35)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.stroke(); ctx.restore();
     // labio superior / boca abierta
     ctx.beginPath(); ctx.moveTo(-21, 10); ctx.quadraticCurveTo(-6, 7, 12, 11);
     ctx.lineTo(12, 12 + jaw * 8); ctx.quadraticCurveTo(-4, 14 + jaw * 14, -21, 11 + jaw * 6); ctx.closePath();
@@ -175,6 +194,12 @@
       ctx.strokeStyle = '#141414'; ctx.lineWidth = 2;
       for (const [x, r] of [[-14, 4], [3, 3.4]]) { ctx.beginPath(); ctx.moveTo(x - r, ey - r); ctx.lineTo(x + r, ey + r); ctx.moveTo(x + r, ey - r); ctx.lineTo(x - r, ey + r); ctx.stroke(); }
     }
+    // ojeras
+    ctx.strokeStyle = C(skin[1]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(-14, ey + 2, L.eye + 2, 0.4, 2.6); ctx.stroke();
+    if ((type === 'mummy' || type === 'pharaoh')) { ctx.strokeStyle = C('#e6dcb8'); ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(-8, -20); ctx.lineTo(12, 0); ctx.stroke(); }
+    // babas al comer
+    if (z.state === 'eat') { ctx.fillStyle = 'rgba(200,230,180,0.75)'; ell(ctx, -10, 16 + jaw * 14 + ((z.animT || 0) * 20 % 8), 1.8, 3); ctx.fill(); }
     // cejas
     ctx.strokeStyle = C('#2c241a'); ctx.lineWidth = 3; ctx.lineCap = 'round';
     ctx.beginPath();
@@ -206,6 +231,15 @@
       circle(ctx, -14, ey, L.eye + 3.5); ctx.stroke(); circle(ctx, 3, ey, L.eye * 0.8 + 3); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-14 + L.eye + 3.5, ey - 1); ctx.lineTo(3 - L.eye * 0.8 - 3, ey - 1); ctx.moveTo(3 + L.eye * 0.8 + 3, ey - 2); ctx.lineTo(19, -4); ctx.stroke();
       ctx.save(); ctx.globalAlpha *= 0.35; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-20, ey - 5); ctx.lineTo(-16, ey - 8); ctx.lineTo(-18, ey + 2); ctx.fill(); ctx.restore();
+    }
+    if (type === 'pharaoh') {
+      ctx.beginPath(); ctx.moveTo(-28, -10); ctx.bezierCurveTo(-30, -48, 26, -50, 28, -14); ctx.lineTo(34, 22); ctx.lineTo(22, 22); ctx.lineTo(20, -6);
+      ctx.quadraticCurveTo(0, -28, -20, -8); ctx.lineTo(-24, 6); ctx.closePath();
+      fs(ctx, lg(ctx, -28, 0, 30, 0, '#ffe07a', '#d8a018'), '#4a3000', 2.5);
+      ctx.save(); ctx.clip(); ctx.fillStyle = C('#2a4ab0');
+      for (let i = -34; i < 40; i += 9) { ctx.beginPath(); ctx.moveTo(i, -50); ctx.lineTo(i + 4, -50); ctx.lineTo(i + 18, 24); ctx.lineTo(i + 14, 24); ctx.fill(); }
+      ctx.restore();
+      ctx.beginPath(); ctx.moveTo(-2, -40); ctx.quadraticCurveTo(4, -50, 8, -40); ctx.strokeStyle = '#c8a030'; ctx.lineWidth = 3; ctx.stroke();
     }
     // cinta del saltador / pañuelo del diablillo
     if (type === 'pole') { ctx.fillStyle = C('#d42a1f'); ctx.beginPath(); ctx.moveTo(-27, -16); ctx.quadraticCurveTo(0, -26, 27, -18); ctx.lineTo(26, -11); ctx.quadraticCurveTo(0, -19, -26, -9); ctx.closePath(); ctx.fill(); }
@@ -247,6 +281,19 @@
       if (frac < 0.67) { ell(ctx, -10, -18, 7, 5); ctx.fill(); ell(ctx, 14, -30, 4, 3); ctx.fill(); }
       if (frac < 0.34) { ell(ctx, 12, -10, 8, 6); ctx.fill(); ctx.beginPath(); ctx.moveTo(-21, -40); ctx.lineTo(-14, -30); ctx.lineTo(-8, -40); ctx.fill(); }
       highlight(ctx, -14, -24, 4, 13, 0.1, 0.55);
+      ctx.restore();
+    } else if (type === 'knight') {
+      ctx.save(); ctx.translate(0, -6);
+      ctx.beginPath(); ctx.moveTo(-28, 16); ctx.lineTo(-30, -14); ctx.bezierCurveTo(-28, -44, 26, -46, 28, -14); ctx.lineTo(28, 16); ctx.quadraticCurveTo(0, 24, -28, 16); ctx.closePath();
+      fs(ctx, lg(ctx, -30, 0, 30, 0, '#f4f6f8', '#a8b0b8', '#5a626a'), '#1e2428', 3);
+      ctx.fillStyle = '#1a1a1a'; ctx.fillRect(-26, -6, 34, 4); ctx.fillRect(-26, 2, 30, 3);
+      for (let i = 0; i < 5; i++) { circle(ctx, -18 + i * 6, 10, 1.6); ctx.fill(); }
+      ctx.strokeStyle = C('#5a626a'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -38); ctx.lineTo(0, -8); ctx.stroke();
+      if (frac < 0.6) { ctx.fillStyle = 'rgba(30,30,30,0.5)'; ell(ctx, 14, -20, 6, 4); ctx.fill(); }
+      if (frac < 0.3) { ell(ctx, -14, -26, 5, 4); ctx.fill(); }
+      highlight(ctx, -14, -24, 4, 12, 0.3, 0.6);
+      // penacho
+      for (let i = 0; i < 5; i++) { ctx.save(); ctx.translate(4, -40); ctx.rotate(0.6 + i * 0.18); ell(ctx, 0, -14, 5, 15); fs(ctx, i % 2 ? '#d42a2a' : '#f04a3a', '#4a0000', 1.5); ctx.restore(); }
       ctx.restore();
     } else if (type === 'football') {
       ctx.save(); ctx.translate(-1, -4);
@@ -293,6 +340,24 @@
     highlight(ctx, -30, -40, 3, 30, 0, 0.35);
     ctx.restore();
   }
+  function sarcophagus(ctx, frac) {
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(-14, -100); ctx.quadraticCurveTo(10, -104, 26, -88); ctx.lineTo(30, -40); ctx.lineTo(24, 40); ctx.lineTo(-20, 40); ctx.lineTo(-30, -40); ctx.lineTo(-34, -86); ctx.quadraticCurveTo(-28, -100, -14, -100); ctx.closePath();
+    fs(ctx, lg(ctx, -34, 0, 30, 0, '#ffe88a', '#e0a818', '#8a5a08'), '#3a2400', 3);
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = C('#2a4ab0'); for (let y = -30; y < 40; y += 14) ctx.fillRect(-36, y, 70, 6);
+    ctx.fillStyle = C('#1a8a8a'); for (let y = -23; y < 40; y += 14) ctx.fillRect(-36, y, 70, 3);
+    if (frac < 0.6) { ctx.fillStyle = 'rgba(30,20,0,0.55)'; ctx.beginPath(); ctx.moveTo(10, -20); ctx.lineTo(28, -10); ctx.lineTo(18, 6); ctx.fill(); }
+    if (frac < 0.3) { ctx.beginPath(); ctx.moveTo(-28, 10); ctx.lineTo(-8, 22); ctx.lineTo(-24, 34); ctx.fill(); }
+    ctx.restore();
+    // máscara dorada
+    ell(ctx, -4, -72, 18, 22); fs(ctx, rg(ctx, -8, -78, 22, '#fff2b0', '#d8a018'), '#3a2400', 2);
+    ctx.fillStyle = '#141414'; ell(ctx, -11, -76, 4, 2.5); ctx.fill(); ell(ctx, 3, -76, 4, 2.5); ctx.fill();
+    ctx.strokeStyle = '#141414'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-15, -76); ctx.lineTo(-19, -74); ctx.moveTo(7, -76); ctx.lineTo(11, -74); ctx.stroke();
+    ctx.fillStyle = C('#2a4ab0'); ctx.fillRect(-8, -60, 8, 14);
+    highlight(ctx, -26, -50, 3, 26, 0, 0.4);
+    ctx.restore();
+  }
   function telephonePole(ctx) {
     ctx.save();
     rrect(ctx, -9, -150, 18, 170, 6); fs(ctx, lg(ctx, -9, 0, 9, 0, '#9a6a3a', '#6a4220', '#3e2610'), '#24140a', 3);
@@ -327,6 +392,8 @@
     if (type === 'pole') { pants = '#d0332a'; pants2 = '#8a1a14'; legOpt = { skin: L.skin[0], shoe: ['#f4f4f0', '#a0a09a'], shorts: true, socks: true, laces: true }; bareArms = true; }
     if (type === 'football') { pants = '#e8e8e2'; pants2 = '#a8a8a0'; legOpt = { skin: L.skin[0], shoe: ['#2a2a2a', '#0a0a0a'], laces: true }; sleeve = '#c4161c'; sleeve2 = '#7a0a0e'; }
     if (type === 'paper') { coat = ['#7f805a', '#4a4b30']; sleeve = coat[0]; sleeve2 = coat[1]; pants = '#6b5a42'; pants2 = '#3e3324'; legOpt = { skin: L.skin[0], shoe: ['#8a3a4a', '#4a1a24'] }; }
+    if (type === 'mummy' || type === 'pharaoh') { coat = ['#e2d6b0', '#a89a70']; sleeve = coat[0]; sleeve2 = coat[1]; pants = '#d8cca4'; pants2 = '#9a8c64'; legOpt = { skin: '#d8cca4', barefoot: true }; }
+    if (type === 'knight') { coat = ['#9aa2aa', '#4a5258']; sleeve = coat[0]; sleeve2 = coat[1]; pants = '#7a828a'; pants2 = '#454c52'; legOpt = { skin: L.skin[0], shoe: ['#9aa2aa', '#3a4248'], sole: '#2a2a2a' }; }
     if (isImp) { pants = '#5a4a8a'; pants2 = '#30264a'; legOpt = { skin: L.skin[0], barefoot: true, shorts: true }; bareArms = true; }
     if (isGarg) { pants = '#4a5a72'; pants2 = '#28324a'; legOpt = { skin: L.skin[0], shoe: ['#3a2a1a', '#140c06'] }; bareArms = true; }
 
@@ -342,6 +409,9 @@
       bR = 0.1 + Math.max(0, Math.cos(ph + Math.PI)) * g.stride * 1.7;
     } else if (eating) {
       a1L = 0.28; a1R = -0.22; bL = 0.35; bR = 0.15;
+    } else if (state === 'fly') {
+      const sw2 = Math.sin((z.animT || 0) * 3);
+      a1L = 0.15 + sw2 * 0.15; a1R = -0.05 - sw2 * 0.15; bL = 0.35; bR = 0.25;
     } else if (state === 'jump') {
       a1L = 0.9; a1R = 0.5; bL = 1.4; bR = 1.0;
     } else if (state === 'smash') {
@@ -379,6 +449,8 @@
     if (type === 'flag') { ba = 2.5; bb = 0.1; }
     if (type === 'paper' && z.armor > 0) { ba = 1.15; bb = -0.75; }
     if (type === 'screendoor' && z.armor > 0) { ba = 1.2; bb = -0.6; }
+    if (type === 'pharaoh' && z.armor > 0) { ba = 1.2; bb = -0.6; }
+    if (type === 'balloon' && z.armor > 0) { ba = 2.85; bb = 0.1; }
     if (type === 'football') { ba = moving ? 0.9 + Math.sin(ph + Math.PI) * 0.7 : 1.2; bb = -1.2; }
     if (isGarg) { ba = state === 'smash' ? smashAngle(z) : 2.2 + Math.sin(ph) * 0.06; bb = -0.2; }
     if (type === 'pole' && z.hasPole && state !== 'jump') { ba = 0.9; bb = -1.1; }
@@ -405,6 +477,17 @@
       const ex = 8 - Math.sin(ba) * 34, ey = -TH - 6 + Math.cos(ba) * 34;
       const hx = ex - Math.sin(ba + bb) * 32, hy = ey + Math.cos(ba + bb) * 32;
       ctx.save(); ctx.translate(hx, hy); ctx.rotate(-(ba + bb) + Math.PI); telephonePole(ctx); ctx.restore();
+    }
+    if (type === 'balloon' && z.armor > 0) {
+      const hx = 4 - Math.sin(ba) * 26 - Math.sin(ba + bb) * 25, hy = -TH + 4 + Math.cos(ba) * 26 + Math.cos(ba + bb) * 25;
+      const bx = 14 + Math.sin(t * 1.7) * 6, by = -TH - 150 + Math.sin(t * 2.3) * 4;
+      ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(hx + 20, (hy + by) / 2, bx, by + 40);
+      ctx.strokeStyle = '#eee'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx, by + 40); ctx.lineTo(bx - 5, by + 47); ctx.lineTo(bx + 5, by + 47); ctx.closePath(); fs(ctx, '#c01818', '#3a0000', 1.5);
+      ell(ctx, bx, by, 34, 40); fs(ctx, rg(ctx, bx, by, 40, '#ff8a7a', '#b0100a'), '#3a0000', 3);
+      crescent(ctx, bx, by, 34, 40, 0.18);
+      highlight(ctx, bx - 12, by - 16, 8, 14, 0.5, 0.6); highlight(ctx, bx - 18, by + 2, 3, 4, 0, 0.5);
+      ctx.fillStyle = 'rgba(80,0,0,0.6)'; ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center'; ctx.fillText('Z', bx + 6, by + 8);
     }
     if (type === 'pole' && z.hasPole && state !== 'jump') {
       line(ctx, [-95, -TH + 20, 110, -TH + 34], 5, '#d8b060', '#4a3510', 2);
@@ -446,6 +529,31 @@
       ctx.lineTo(TW - 7, 10); ctx.lineTo(TW - 12, 3); ctx.lineTo(4, 11); ctx.lineTo(-2, 3); ctx.lineTo(-8, 9); ctx.lineTo(-14, 2); ctx.lineTo(-19, 8);
       ctx.closePath();
       fs(ctx, lg(ctx, -TW, 0, TW, 0, c1, c2), ZO, 3);
+      ctx.save();
+      ctx.beginPath(); ctx.moveTo(-TW + 1, 4); ctx.lineTo(-TW - 2, -TH + 6); ctx.quadraticCurveTo(0, -TH - 6, TW, -TH + 6); ctx.lineTo(TW - 2, 10); ctx.lineTo(-TW, 10); ctx.closePath(); ctx.clip();
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(TW * 0.25, -TH - 10, TW, TH + 30);
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(-TW - 4, -10, TW * 2 + 8, 22);
+      ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(-TW + 4, -18); ctx.quadraticCurveTo(-8, -12, -2, -24); ctx.moveTo(TW - 6, -30); ctx.quadraticCurveTo(TW - 12, -20, TW - 4, -8); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-TW + 2, -TH + 10); ctx.lineTo(-TW + 2, -8); ctx.stroke();
+      if (type === 'mummy' || type === 'pharaoh') {
+        ctx.strokeStyle = 'rgba(110,95,60,0.55)'; ctx.lineWidth = 1.5;
+        for (let y = -TH; y < 10; y += 7) { ctx.beginPath(); ctx.moveTo(-TW - 4, y + 3); ctx.lineTo(TW + 4, y - 3); ctx.stroke(); }
+        ctx.fillStyle = 'rgba(60,40,20,0.25)'; ell(ctx, -6, -30, 5, 7); ctx.fill();
+      }
+      if (type === 'knight') {
+        ctx.fillStyle = 'rgba(40,40,50,0.35)';
+        for (let y = -TH; y < 10; y += 5) for (let x = -TW; x < TW; x += 5) { circle(ctx, x + ((y / 5) % 2 ? 2.5 : 0), y, 1.2); ctx.fill(); }
+      }
+      ctx.restore();
+      if (type === 'knight' && z.armor > 0) {
+        ctx.beginPath(); ctx.moveTo(-TW + 2, -TH + 8); ctx.quadraticCurveTo(0, -TH, TW - 2, -TH + 8); ctx.lineTo(TW - 4, -14); ctx.quadraticCurveTo(0, -4, -TW + 4, -14); ctx.closePath();
+        fs(ctx, lg(ctx, -TW, 0, TW, 0, '#f4f6f8', '#a8b0b8', '#4a525a'), '#1e2428', 2.5);
+        highlight(ctx, -8, -TH + 22, 4, 12, 0.2, 0.55);
+        ctx.strokeStyle = '#d42a2a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -TH + 12); ctx.lineTo(0, -20); ctx.moveTo(-8, -TH + 22); ctx.lineTo(8, -TH + 22); ctx.stroke();
+      }
+      if (type === 'mummy' || type === 'pharaoh' || type === 'knight') { /* sin camisa ni corbata */ } else
       if (type === 'pole') {
         ctx.fillStyle = C('#d0332a'); ctx.fillRect(-TW, -TH + 18, TW * 2 - 1, 7);
         UIText(ctx, '7', 0, -20, 18, '#222');
@@ -493,7 +601,7 @@
       if (eating) jaw = 0.12 + Math.max(0, Math.sin((z.animT || 0) * 10)) * 0.32;
       if (dying) jaw = 0.35;
       if (state === 'smash') jaw = 0.35;
-      head(ctx, z, L, jaw, { dead: dying && z.dieT > 0.3, noHair: type === 'football' || type === 'imp' });
+      head(ctx, z, L, jaw, { dead: dying && z.dieT > 0.3, noHair: ['football', 'imp', 'knight', 'mummy', 'pharaoh'].includes(type) });
       headArmor(ctx, type, z.armor > 0 ? z.armor / z.armorMax : 0);
       ctx.restore();
     }
@@ -501,13 +609,14 @@
     // ----- objetos delante -----
     if (type === 'paper' && z.armor > 0) { ctx.save(); ctx.translate(-50, -TH + 6); newspaper(ctx, z.armor / z.armorMax); ctx.restore(); }
     if (type === 'screendoor' && z.armor > 0) { ctx.save(); ctx.translate(-44, -TH + 30); screenDoor(ctx, z.armor / z.armorMax); ctx.restore(); }
+    if (type === 'pharaoh' && z.armor > 0) { ctx.save(); ctx.translate(-50, -TH + 34); sarcophagus(ctx, z.armor / z.armorMax); ctx.restore(); }
 
     // brazo delantero
     let fa = 1.45 + (moving ? Math.sin(ph + 0.4) * 0.14 : Math.sin((z.animT || 0) * 1.4) * 0.04), fb = -0.15;
     if (eating) { fa = 2.05 + Math.sin((z.animT || 0) * 10) * 0.25; fb = -0.55; }
     if (dying) { fa = 0.3; fb = 0.15; }
     if (type === 'paper' && z.armor > 0) { fa = 1.05; fb = -0.95; }
-    if (type === 'screendoor' && z.armor > 0) { fa = 1.15; fb = -0.75; }
+    if ((type === 'screendoor' || type === 'pharaoh') && z.armor > 0) { fa = 1.15; fb = -0.75; }
     if (type === 'football') { fa = moving ? 0.9 + Math.sin(ph) * 0.7 : 1.3; fb = -1.2; }
     if (type === 'pole' && z.hasPole && state !== 'jump') { fa = 1.1; fb = -1.2; }
     if (state === 'jump') { fa = 2.8; fb = 0; }
@@ -546,6 +655,8 @@
   function armorPiece(ctx, type) {
     if (type === 'paper') { newspaper(ctx, 0.2); return; }
     if (type === 'screendoor') { ctx.scale(0.8, 0.8); screenDoor(ctx, 0.2); return; }
+    if (type === 'pharaoh') { ctx.scale(0.7, 0.7); sarcophagus(ctx, 0.2); return; }
+    if (type === 'balloon') { ctx.fillStyle = '#c01818'; for (let i = 0; i < 5; i++) { ctx.save(); ctx.rotate(i * 1.3); ctx.fillRect(4, -3, 12, 5); ctx.restore(); } return; }
     headArmor(ctx, type, 0.2);
   }
   // Bloque de hielo para zombis congelados

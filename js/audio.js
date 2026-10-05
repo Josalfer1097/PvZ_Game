@@ -185,6 +185,13 @@ const Sfx = (() => {
               'A5 - - G5 F5 - - - | D6 - - - Bb5 - - - | C6 - - Bb5 A5 - G5 - | A5 - - - . . . .',
       bass: 'R...5...', drums: { k: 'x.......', s: '....r...', h: '..o...o.' }, pad: 0.02, arp: 'marimba', arpVol: 0.06, arpEvery: 2,
     },
+    egypt: {
+      bpm: 108, swing: 0.08, lead: 'whistle', leadVol: 0.13, bassInst: 'pizz',
+      chords: 'E F E Dm E F Dm E',
+      melody: 'E5 - F5 G#5 A5 - G#5 F5 | E5 - - - F5 E5 D5 C5 | B4 - C5 D5 E5 - D5 C5 | D5 - F5 - A5 - F5 D5 |' +
+              'E5 F5 G#5 B5 A5 - G#5 - | A5 - C6 B5 A5 - F5 - | F5 - E5 D5 C5 - B4 A4 | G#4 - - - E4 - - .',
+      bass: 'R..R..5.', drums: { k: 'x..x..x.', s: '....x...', h: 'o.o.o.oo' }, pad: 0.012, arp: 'marimba', arpVol: 0.07,
+    },
     intense: {
       bpm: 142, swing: 0, lead: 'lead', leadVol: 0.13, bassInst: 'bass',
       chords: 'Em C D B7 Em C Am B7',
