@@ -10,6 +10,9 @@ const App = {
   mouse: UI.mouse,
   bgCache: {},
   confirmReset: false,
+  renderScale: 1, perf: { acc: 0, n: 0, slow: 0, fast: 0 },
+  alm: { tab: 'plants', sel: 'peashooter', z: null },
+  menuZombies: null,
 
   init() {
     Save.load();
@@ -31,17 +34,22 @@ const App = {
     window.addEventListener('keydown', e => {
       Sfx.init();
       if (this.screen === 'game' && this.game) { this.game.onKey(e.key); if (e.key === ' ') e.preventDefault(); }
-      else if (e.key === 'Escape' && this.screen === 'levels') this.go('menu');
+      else if (e.key === 'Escape' && this.screen !== 'menu') this.go('menu');
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.game && this.game.phase === 'play') this.game.paused = true;
     });
+    // zombis que desfilan por el menú
+    this.menuZombies = ['cone', 'normal', 'bucket', 'gargantuar', 'football', 'imp', 'screendoor'].map((type, i) => ({
+      type, look: Art.zombieLook(type), animT: i * 1.7, state: 'walk', armor: 1, armorMax: 1, hasPole: true, hasImp: true, impLook: Art.zombieLook('imp'),
+      x: 1100 + i * 260, y: 800 + (i % 2) * 40, spd: 26 * ZOMBIES[type].speed,
+    }));
     requestAnimationFrame(ts => this.loop(ts));
   },
 
   resize() {
     const cw = window.innerWidth, ch = window.innerHeight;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 3);
+    this.dpr = Math.min(window.devicePixelRatio || 1, 3) * this.renderScale;
     this.canvas.width = Math.round(cw * this.dpr);
     this.canvas.height = Math.round(ch * this.dpr);
     this.canvas.style.width = cw + 'px';
@@ -57,16 +65,15 @@ const App = {
   },
 
   // Fondo pre-renderizado a la resolución física real (nitidez HD)
-  getBg(lanes) {
-    const key = lanes.join(',');
-    if (this.bgCache[key]) return this.bgCache[key];
+  getBg(stage) {
+    if (this.bgCache[stage]) return this.bgCache[stage];
     const k = this.scale * this.dpr;
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(W * k)); c.height = Math.max(1, Math.round(H * k));
     const g = c.getContext('2d');
     g.setTransform(k, 0, 0, k, 0, 0);
-    Art.background(g, lanes);
-    this.bgCache[key] = c;
+    Art.background(g, stage);
+    this.bgCache[stage] = c;
     return c;
   },
 
@@ -74,9 +81,30 @@ const App = {
     const dt = Math.min(0.05, (ts - (this.last || ts)) / 1000);
     this.last = ts;
     this.t += dt;
+    this.adaptQuality(dt);
     if (this.screen === 'game' && this.game) this.game.update(dt);
+    if (this.screen === 'menu') {
+      for (const z of this.menuZombies) {
+        z.animT += dt;
+        z.x -= z.spd * Art.stepPulse(z) * dt;
+        if (z.x < -150) z.x = W + 200 + Math.random() * 300;
+      }
+    }
     this.draw();
     requestAnimationFrame(t => this.loop(t));
+  },
+
+  // Resolución adaptativa: si el equipo no llega a ~40 fps, baja un poco la
+  // resolución interna; si va sobrado, la vuelve a subir hasta el máximo (HD).
+  adaptQuality(dt) {
+    if (document.hidden || dt <= 0) return;
+    const P = this.perf;
+    P.acc += dt; P.n++;
+    if (P.acc < 1) return;
+    const avg = P.acc / P.n; P.acc = 0; P.n = 0;
+    if (avg > 1 / 40) { P.slow++; P.fast = 0; } else if (avg < 1 / 55) { P.fast++; P.slow = 0; } else { P.slow = 0; P.fast = 0; }
+    if (P.slow >= 2 && this.renderScale > 0.5) { this.renderScale = Math.max(0.5, this.renderScale - 0.15); P.slow = 0; this.resize(); }
+    else if (P.fast >= 6 && this.renderScale < 1) { this.renderScale = Math.min(1, this.renderScale + 0.1); P.fast = 0; this.resize(); }
   },
 
   draw() {
@@ -90,6 +118,7 @@ const App = {
     UI.reset();
     if (this.screen === 'menu') this.drawMenu(ctx);
     else if (this.screen === 'levels') this.drawLevels(ctx);
+    else if (this.screen === 'almanac') this.drawAlmanac(ctx);
     else if (this.screen === 'game' && this.game) this.game.draw(ctx);
     ctx.restore();
     this.canvas.style.cursor = UI.find(this.mouse.x, this.mouse.y) ? 'pointer' : 'default';
@@ -104,106 +133,179 @@ const App = {
     this.game = new Game(this, idx);
     this.screen = 'game';
   },
-  completeLevel(idx) {
-    const d = Save.data;
-    if (typeof idx === 'number') {
-      const L = LEVELS[idx];
-      if (L.reward && !d.plants.includes(L.reward)) d.plants.push(L.reward);
-      d.level = Math.max(d.level, idx + 1);
-      Save.save();
-      if (idx + 1 < LEVELS.length) { this.startLevel(idx + 1); return; }
-    }
-    this.go('menu');
+  markDone(idx) {
+    if (typeof idx === 'number' && !Save.data.done.includes(idx)) { Save.data.done.push(idx); Save.save(); }
+  },
+  nextLevel() {
+    for (let i = 0; i < LEVELS.length; i++) if (!Save.data.done.includes(i)) return i;
+    return 0;
+  },
+
+  dimBg(ctx, stage, a = 0.5) {
+    ctx.drawImage(this.getBg(stage), 0, 0, W, H);
+    ctx.fillStyle = `rgba(5,10,20,${a})`; ctx.fillRect(0, 0, W, H);
   },
 
   // ---------------- Menú principal ----------------
   drawMenu(ctx) {
     const t = this.t;
-    ctx.drawImage(this.getBg(ALL_LANES), 0, 0, W, H);
+    ctx.drawImage(this.getBg('dusk'), 0, 0, W, H);
     const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, 'rgba(10,20,40,0.55)'); g.addColorStop(1, 'rgba(10,10,5,0.65)');
+    g.addColorStop(0, 'rgba(30,10,60,0.55)'); g.addColorStop(1, 'rgba(10,5,5,0.7)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
-    // decoración
+    // desfile de zombis por la parte de abajo
+    const zs = this.menuZombies.slice().sort((a, b) => a.y - b.y);
+    for (const z of zs) {
+      ctx.save(); ctx.translate(z.x, z.y); Art.shadow(ctx, 0, 0, 40, 10); ctx.scale(1.15, 1.15);
+      Art.zombie(ctx, z, t); ctx.restore();
+    }
     const deco = (type, x, y, s, ph) => { ctx.save(); ctx.translate(x, y); Art.shadow(ctx, 0, 2, 40, 10); ctx.scale(s, s); Art.plant(ctx, type, t + ph, { seed: ph, armed: true }); ctx.restore(); };
-    deco('sunflower', 190, 640, 2.0, 0);
-    deco('peashooter', 360, 760, 1.9, 1);
-    deco('wallnut', 160, 860, 1.6, 2);
-    deco('chomper', 420, 520, 1.3, 3);
-    ctx.save(); ctx.translate(1340, 820); Art.shadow(ctx, 0, 0, 60, 14); ctx.scale(2.3, 2.3);
-    Art.zombie(ctx, { type: 'cone', animT: t, state: 'walk', armor: 1, armorMax: 1 }, t); ctx.restore();
-    ctx.save(); ctx.translate(1500, 650); ctx.scale(1.4, 1.4);
-    Art.zombie(ctx, { type: 'normal', animT: t + 1.3, state: 'walk', armor: 0, armorMax: 1 }, t); ctx.restore();
+    deco('twinsunflower', 210, 560, 2.0, 0);
+    deco('gatling', 400, 700, 1.8, 1);
+    deco('torchwood', 150, 790, 1.4, 2);
+    deco('wintermelon', 1360, 560, 1.6, 3);
+    deco('chomper', 1200, 690, 1.4, 4);
 
     // logo
-    ctx.save(); ctx.translate(W / 2, 150); ctx.rotate(Math.sin(t * 1.2) * 0.012);
+    ctx.save(); ctx.translate(W / 2, 130); ctx.rotate(Math.sin(t * 1.2) * 0.012);
     ctx.font = `120px ${UI.FONT}`;
     const w1 = ctx.measureText('JARDÍN').width, w3 = ctx.measureText('ZOMBIS').width;
     ctx.font = `60px ${UI.FONT}`;
     const w2 = ctx.measureText('vs').width + 40;
-    const total = w1 + w2 + w3, x0 = -total / 2;
-    UI.text(ctx, 'JARDÍN', x0 + w1 / 2, 0, 120, { fill: Art.lg(ctx, 0, -60, 0, 60, '#d6ff8a', '#4aa81c'), stroke: '#10300a', lw: 16 });
+    const x0 = -(w1 + w2 + w3) / 2;
+    UI.text(ctx, 'JARDÍN', x0 + w1 / 2, 0, 120, { fill: Art.lg(ctx, 0, -60, 0, 60, '#e2ff9a', '#4aa81c'), stroke: '#10300a', lw: 16 });
     UI.text(ctx, 'vs', x0 + w1 + w2 / 2, 18, 60, { fill: '#ffe24a', stroke: '#4a2a00', lw: 10 });
-    UI.text(ctx, 'ZOMBIS', x0 + w1 + w2 + w3 / 2, 0, 120, { fill: Art.lg(ctx, 0, -60, 0, 60, '#d9e3c4', '#7d8c62'), stroke: '#1a1a12', lw: 16 });
-    UI.text(ctx, 'EDICIÓN HD', 0, 92, 34, { fill: '#fff', stroke: '#2a1a08', lw: 7 });
+    UI.text(ctx, 'ZOMBIS', x0 + w1 + w2 + w3 / 2, 0, 120, { fill: Art.lg(ctx, 0, -60, 0, 60, '#dfe8c8', '#7d8c62'), stroke: '#1a1a12', lw: 16 });
+    UI.text(ctx, 'EDICIÓN HD · TODO GRATIS', 0, 92, 34, { fill: '#fff', stroke: '#2a1a08', lw: 7 });
     ctx.restore();
 
     const d = Save.data;
-    const lvl = Math.min(d.level, LEVELS.length - 1);
-    const bx = W / 2 - 200, bw = 400;
-    let y = 300;
-    const done = d.level >= LEVELS.length;
-    UI.button(ctx, bx, y, bw, 86, done ? 'Aventura completada' : `Aventura · Nivel ${lvl + 1}`, () => { Sfx.play('click'); this.startLevel(lvl); }, { size: 36 });
-    y += 106;
-    UI.button(ctx, bx, y, bw, 70, 'Elegir nivel', () => { Sfx.play('click'); this.go('levels'); }, { size: 32, color: 'orange' });
-    y += 90;
-    UI.button(ctx, bx, y, bw, 70, done ? `Modo infinito (récord: ${d.best || 0})` : 'Modo infinito 🔒', () => {
-      Sfx.play('click'); this.startLevel('endless');
-    }, { size: done ? 26 : 30, color: 'red', disabled: !done });
-    y += 90;
-    UI.button(ctx, bx, y, bw / 2 - 8, 60, `Sonido: ${d.sound ? 'Sí' : 'No'}`, () => { Sfx.setSound(!d.sound); Sfx.play('click'); }, { size: 24, color: 'stone' });
-    UI.button(ctx, bx + bw / 2 + 8, y, bw / 2 - 8, 60, `Música: ${d.music ? 'Sí' : 'No'}`, () => { Sfx.setMusic(!d.music); Sfx.play('click'); }, { size: 24, color: 'stone' });
+    const bx = W / 2 - 210, bw = 420;
+    let y = 270;
+    const nxt = this.nextLevel();
+    const allDone = d.done.length >= LEVELS.length;
+    UI.button(ctx, bx, y, bw, 84, allDone ? '¡Todo superado! Jugar' : `Jugar · Nivel ${nxt + 1}`, () => { Sfx.play('click'); this.startLevel(nxt); }, { size: 36 });
+    y += 100;
+    UI.button(ctx, bx, y, bw, 66, 'Elegir nivel', () => { Sfx.play('click'); this.go('levels'); }, { size: 30, color: 'orange' });
+    y += 82;
+    UI.button(ctx, bx, y, bw, 66, `Modo infinito · récord ${d.best || 0}`, () => { Sfx.play('click'); this.startLevel('endless'); }, { size: 28, color: 'red' });
+    y += 82;
+    UI.button(ctx, bx, y, bw, 66, 'Almanaque', () => { Sfx.play('click'); this.go('almanac'); }, { size: 30, color: 'green' });
+    y += 82;
+    UI.button(ctx, bx, y, bw / 2 - 8, 56, `Sonido: ${d.sound ? 'Sí' : 'No'}`, () => { Sfx.setSound(!d.sound); Sfx.play('click'); }, { size: 22, color: 'stone' });
+    UI.button(ctx, bx + bw / 2 + 8, y, bw / 2 - 8, 56, `Música: ${d.music ? 'Sí' : 'No'}`, () => { Sfx.init(); Sfx.setMusic(!d.music); Sfx.play('click'); }, { size: 22, color: 'stone' });
 
-    UI.text(ctx, 'Recoge soles · Planta defensas · ¡Que no entren en tu casa!', W / 2, 840, 24, { fill: '#f4ecd0', stroke: '#1a1005', lw: 5, font: UI.BODY, weight: 'bold' });
-    UI.text(ctx, 'Teclas: 1-8 elegir planta · S pala · Esc pausa · Clic derecho cancelar', W / 2, 872, 18, { fill: '#cfc6a8', stroke: '#1a1005', lw: 4, font: UI.BODY, weight: 'bold' });
+    UI.text(ctx, 'Teclas: 1-9 y 0 elegir planta · S pala · Esc pausa · Clic derecho cancelar', W / 2, 884, 18, { fill: '#e8dfc0', stroke: '#1a1005', lw: 4, font: UI.BODY, weight: 'bold' });
   },
 
   // ---------------- Selección de nivel ----------------
   drawLevels(ctx) {
     const t = this.t;
-    ctx.drawImage(this.getBg(ALL_LANES), 0, 0, W, H);
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, W, H);
-    const px = 260, py = 70, pw = 1080, ph = 760;
+    this.dimBg(ctx, 'day', 0.5);
+    const px = 150, py = 40, pw = 1300, ph = 820;
     UI.panel(ctx, px, py, pw, ph);
-    UI.text(ctx, 'Elige un nivel', W / 2, py + 60, 56, { fill: '#ffe48a', stroke: '#3a1e05', lw: 9 });
+    UI.text(ctx, 'Elige un nivel', W / 2, py + 52, 54, { fill: '#ffe48a', stroke: '#3a1e05', lw: 9 });
+    UI.text(ctx, 'Todos los niveles están desbloqueados', W / 2, py + 96, 22, { fill: '#f7e9c2', stroke: null, font: UI.BODY, weight: 'bold' });
     const d = Save.data;
+    const stageCol = { day: ['#5f9a34', '#3f7a22'], dusk: ['#c0703a', '#8a4a24'], night: ['#3a4a8a', '#24305a'] };
+    const cw = 222, chh = 128, gap = 14;
     LEVELS.forEach((L, i) => {
-      const cx = px + 70 + (i % 4) * 240, cy = py + 120 + Math.floor(i / 4) * 170;
-      const locked = i > d.level;
-      const over = !locked && UI.isOver(cx, cy, 220, 150);
+      const cx = px + 52 + (i % 5) * (cw + gap + 4), cy = py + 120 + Math.floor(i / 5) * (chh + gap);
+      const over = UI.isOver(cx, cy, cw, chh);
       ctx.save();
-      Art.rrect(ctx, cx, cy, 220, 150, 18);
-      ctx.fillStyle = locked ? '#3a3328' : over ? '#6a9a3a' : '#4f7a2a'; ctx.fill();
-      ctx.lineWidth = 4; ctx.strokeStyle = '#1e1408'; ctx.stroke();
-      if (!locked) {
-        ctx.save(); Art.rrect(ctx, cx, cy, 220, 150, 18); ctx.clip();
-        ctx.translate(cx + 170, cy + 140); ctx.scale(0.62, 0.62);
-        const zt = L.zombies[L.zombies.length - 1];
-        Art.zombie(ctx, { type: zt, animT: t + i, state: over ? 'walk' : 'idle', armor: 1, armorMax: 1, hasPole: true }, t);
-        ctx.restore();
-        if (L.reward) { ctx.save(); ctx.translate(cx + 50, cy + 132); ctx.scale(0.5, 0.5); Art.plant(ctx, L.reward, t + i, { armed: true }); ctx.restore(); }
-      }
-      UI.text(ctx, locked ? '🔒' : `${i + 1}`, cx + 40, cy + 36, 40, { fill: '#fff', stroke: '#1e1408', lw: 7 });
-      if (i < d.level) UI.text(ctx, '✔', cx + 196, cy + 28, 30, { fill: '#b8ff6a', stroke: '#1e1408', lw: 5, font: UI.BODY });
+      if (over) { ctx.translate(cx + cw / 2, cy + chh / 2); ctx.scale(1.04, 1.04); ctx.translate(-(cx + cw / 2), -(cy + chh / 2)); }
+      Art.rrect(ctx, cx, cy, cw, chh, 18);
+      const col = stageCol[L.stage];
+      ctx.fillStyle = Art.lg(ctx, 0, cy, 0, cy + chh, col[0], col[1]); ctx.fill();
+      ctx.lineWidth = 4; ctx.strokeStyle = over ? '#ffe48a' : '#1e1408'; ctx.stroke();
+      ctx.save(); Art.rrect(ctx, cx, cy, cw, chh, 18); ctx.clip();
+      ctx.translate(cx + 168, cy + 122);
+      const zt = L.zombies[L.zombies.length - 1];
+      const sc = zt === 'gargantuar' ? 0.36 : 0.52;
+      ctx.scale(sc, sc);
+      Art.zombie(ctx, { type: zt, look: null, animT: t + i, state: over ? 'walk' : 'idle', armor: 1, armorMax: 1, hasPole: true, hasImp: true }, t);
       ctx.restore();
-      if (!locked) UI.region(cx, cy, 220, 150, () => { Sfx.play('click'); this.startLevel(i); });
+      UI.text(ctx, `${i + 1}`, cx + 36, cy + 36, 40, { fill: '#fff', stroke: '#1e1408', lw: 7 });
+      UI.text(ctx, STAGES[L.stage].name, cx + 16, cy + 76, 18, { align: 'left', fill: '#fff', stroke: '#1e1408', lw: 4, font: UI.BODY, weight: 'bold' });
+      UI.text(ctx, `${L.waves} oleadas`, cx + 16, cy + 100, 16, { align: 'left', fill: '#f4ecd0', stroke: '#1e1408', lw: 3, font: UI.BODY, weight: 'bold' });
+      if (d.done.includes(i)) UI.text(ctx, '★', cx + 36, cy + 120, 26, { fill: '#ffd23a', stroke: '#4a2a00', lw: 4, font: UI.BODY });
+      ctx.restore();
+      UI.region(cx, cy, cw, chh, () => { Sfx.play('click'); this.startLevel(i); });
     });
-    UI.button(ctx, px + 40, py + ph - 90, 200, 62, 'Volver', () => { Sfx.play('click'); this.go('menu'); }, { size: 28, color: 'stone' });
-    UI.button(ctx, px + pw - 300, py + ph - 90, 260, 62, this.confirmReset ? '¿Seguro?' : 'Borrar progreso', () => {
+    UI.button(ctx, px + 40, py + ph - 86, 200, 60, 'Volver', () => { Sfx.play('click'); this.go('menu'); }, { size: 28, color: 'stone' });
+    UI.button(ctx, W / 2 - 170, py + ph - 90, 340, 66, 'Modo infinito', () => { Sfx.play('click'); this.startLevel('endless'); }, { size: 30, color: 'red' });
+    UI.button(ctx, px + pw - 290, py + ph - 86, 250, 60, this.confirmReset ? '¿Seguro?' : 'Borrar estrellas', () => {
       Sfx.play('click');
-      if (this.confirmReset) { Save.data.level = 0; Save.data.plants = ['peashooter']; Save.data.best = 0; Save.save(); this.confirmReset = false; }
+      if (this.confirmReset) { Save.data.done = []; Save.data.best = 0; Save.save(); this.confirmReset = false; }
       else this.confirmReset = true;
-    }, { size: 24, color: 'red' });
+    }, { size: 22, color: 'orange' });
+  },
+
+  // ---------------- Almanaque ----------------
+  drawAlmanac(ctx) {
+    const t = this.t, A = this.alm;
+    this.dimBg(ctx, 'night', 0.4);
+    const px = 60, py = 30, pw = 1480, ph = 840;
+    UI.panel(ctx, px, py, pw, ph);
+    UI.text(ctx, 'Almanaque', px + 330, py + 52, 50, { fill: '#ffe48a', stroke: '#3a1e05', lw: 8 });
+    UI.button(ctx, px + 40, py + 92, 280, 52, 'Plantas', () => { A.tab = 'plants'; A.sel = 'peashooter'; Sfx.play('click'); }, { size: 24, color: A.tab === 'plants' ? 'green' : 'stone' });
+    UI.button(ctx, px + 340, py + 92, 280, 52, 'Zombis', () => { A.tab = 'zombies'; A.sel = 'normal'; A.z = null; Sfx.play('click'); }, { size: 24, color: A.tab === 'zombies' ? 'red' : 'stone' });
+    // cuadrícula
+    if (A.tab === 'plants') {
+      PLANT_ORDER.forEach((type, i) => {
+        const x = px + 40 + (i % 6) * 98, y = py + 160 + Math.floor(i / 6) * 126;
+        UI.packet(ctx, x, y, type, t, { premium: PLANTS[type].premium });
+        if (A.sel === type) { Art.rrect(ctx, x - 3, y - 3, 90, 122, 10); ctx.lineWidth = 4; ctx.strokeStyle = '#ffe48a'; ctx.stroke(); }
+        UI.region(x, y, 84, 116, () => { A.sel = type; Sfx.play('select'); });
+      });
+    } else {
+      ZOMBIE_ORDER.forEach((type, i) => {
+        const x = px + 40 + (i % 4) * 146, y = py + 160 + Math.floor(i / 4) * 160;
+        Art.rrect(ctx, x, y, 134, 148, 14); ctx.fillStyle = A.sel === type ? '#6a8a4a' : '#3e5a2a'; ctx.fill();
+        ctx.lineWidth = A.sel === type ? 4 : 3; ctx.strokeStyle = A.sel === type ? '#ffe48a' : '#1e1408'; ctx.stroke();
+        ctx.save(); Art.rrect(ctx, x, y, 134, 148, 14); ctx.clip();
+        ctx.translate(x + 74, y + 74); ctx.scale(type === 'gargantuar' ? 0.75 : 1, type === 'gargantuar' ? 0.75 : 1);
+        Art.zombieHead(ctx, { type, armor: 1, armorMax: 1, look: null }, true);
+        ctx.restore();
+        UI.text(ctx, ZOMBIES[type].name.replace('Zombi ', ''), x + 67, y + 132, 15, { fill: '#fff', stroke: '#1e1408', lw: 4, font: UI.BODY, weight: 'bold' });
+        UI.region(x, y, 134, 148, () => { A.sel = type; A.z = null; Sfx.play('select'); });
+      });
+    }
+    // ficha
+    const fx = px + 660, fy = py + 30, fw = 780, fh = 760;
+    Art.rrect(ctx, fx, fy, fw, fh, 20);
+    ctx.fillStyle = 'rgba(20,12,4,0.55)'; ctx.fill();
+    // escenario de muestra
+    ctx.save(); Art.rrect(ctx, fx + 20, fy + 20, fw - 40, 430, 16); ctx.clip();
+    ctx.drawImage(this.getBg(A.tab === 'plants' ? 'day' : 'night'), 300, 300, 600, 380, fx + 20, fy + 20, fw - 40, 430);
+    if (A.tab === 'plants') {
+      ctx.translate(fx + fw / 2, fy + 400); Art.shadow(ctx, 0, 4, 80, 18); ctx.scale(2.8, 2.8);
+      Art.plant(ctx, A.sel, t, { armed: true, seed: 1, recoil: Math.max(0, Math.sin(t * 3)) * 0.6, glow: Math.max(0, Math.sin(t)), loaded: true });
+    } else {
+      if (!A.z || A.z.type !== A.sel) A.z = { type: A.sel, look: Art.zombieLook(A.sel, 0.5), animT: 0, state: 'walk', armor: 1, armorMax: 1, hasPole: true, hasImp: true, impLook: Art.zombieLook('imp') };
+      A.z.animT += 1 / 60;
+      const big = A.sel === 'gargantuar' ? 0.95 : A.sel === 'imp' ? 2.6 : 1.9;
+      ctx.translate(fx + fw / 2 + 40, fy + 430); Art.shadow(ctx, 0, 0, 70, 16); ctx.scale(big, big);
+      Art.zombie(ctx, A.z, t);
+    }
+    ctx.restore();
+    if (A.tab === 'plants') {
+      const d = PLANTS[A.sel];
+      UI.text(ctx, d.name, fx + fw / 2, fy + 500, 50, { fill: '#ffe48a', stroke: '#3a1e05', lw: 8 });
+      UI.text(ctx, d.desc, fx + fw / 2, fy + 560, 24, { fill: '#f4ecd0', stroke: null, font: UI.BODY, weight: 'bold' });
+      UI.text(ctx, `Coste: ${d.cost} soles   ·   Recarga: ${d.cd} s   ·   Resistencia: ${d.hp}`, fx + fw / 2, fy + 620, 24, { fill: '#c8e8a0', stroke: null, font: UI.BODY, weight: 'bold' });
+      if (d.premium) UI.text(ctx, '★ En el juego original era de pago. ¡Aquí es GRATIS! ★', fx + fw / 2, fy + 680, 24, { fill: '#ffd23a', stroke: '#3a1e05', lw: 5 });
+    } else {
+      const d = ZOMBIES[A.sel];
+      UI.text(ctx, d.name, fx + fw / 2, fy + 500, 50, { fill: '#c8f08a', stroke: '#10200a', lw: 8 });
+      UI.text(ctx, d.desc, fx + fw / 2, fy + 560, 24, { fill: '#f4ecd0', stroke: null, font: UI.BODY, weight: 'bold' });
+      const speed = d.speed >= 1.8 ? 'Rápida' : d.speed <= 0.85 ? 'Lenta' : 'Normal';
+      const tough = d.hp + d.armor;
+      const lvl = tough >= 2000 ? 'Altísima' : tough >= 1000 ? 'Alta' : tough >= 500 ? 'Media' : 'Baja';
+      UI.text(ctx, `Resistencia: ${lvl} (${tough})   ·   Velocidad: ${speed}`, fx + fw / 2, fy + 620, 24, { fill: '#ffb8a0', stroke: null, font: UI.BODY, weight: 'bold' });
+    }
+    UI.button(ctx, px + 40, py + ph - 86, 200, 60, 'Volver', () => { Sfx.play('click'); this.go('menu'); }, { size: 28, color: 'stone' });
   },
 };
 

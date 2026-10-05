@@ -64,36 +64,60 @@ const UI = {
     Art.rrect(ctx, x + 12, y + 12, w - 24, h - 24, 18); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,220,160,0.35)'; ctx.stroke();
   },
 
+  packetCache: {},
+  // El dibujo base del sobre se guarda como imagen a la resolución real
+  packetImage(type, premium) {
+    const k = (typeof App !== 'undefined' ? App.scale * App.dpr : 1) || 1;
+    const key = type + (premium ? '*' : '') + '@' + k.toFixed(3);
+    let c = this.packetCache[key];
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = Math.ceil(84 * k); c.height = Math.ceil(116 * k);
+    const g = c.getContext('2d');
+    g.setTransform(k, 0, 0, k, 0, 0);
+    this.packetBase(g, type, premium);
+    this.packetCache[key] = c;
+    return c;
+  },
   packet(ctx, x, y, type, t, o = {}) {
     const w = 84, h = 116;
     ctx.save();
     if (o.selected) ctx.globalAlpha = 0.55;
-    Art.rrect(ctx, x, y, w, h, 9);
-    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#fbf6d8'); g.addColorStop(1, '#d6c789');
-    ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#4c6a1c'; ctx.stroke();
-    Art.rrect(ctx, x + 5, y + 5, w - 10, h - 36, 6); ctx.fillStyle = 'rgba(120,180,70,0.22)'; ctx.fill();
-    // planta
-    ctx.save();
-    Art.rrect(ctx, x + 3, y + 3, w - 6, h - 32, 6); ctx.clip();
-    const tall = { tallnut: 0.42, threepeater: 0.46, chomper: 0.44, jalapeno: 0.5 }[type] || 0.56;
-    ctx.translate(x + w / 2 - 2, y + h - 38); ctx.scale(tall, tall);
-    Art.plant(ctx, type, t * 0.5, { armed: true });
-    ctx.restore();
-    // coste
-    Art.rrect(ctx, x + 10, y + h - 30, w - 20, 24, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#8a7a40'; ctx.stroke();
-    this.text(ctx, String(PLANTS[type].cost), x + w / 2, y + h - 17, 20, { fill: '#222', stroke: null, font: this.FONT });
-    // recarga / sin soles
+    ctx.drawImage(this.packetImage(type, o.premium), x, y, w, h);
     if (o.cd > 0) {
       ctx.save(); Art.rrect(ctx, x, y, w, h, 9); ctx.clip();
       ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x, y, w, h * o.cd);
       ctx.restore();
     }
     if (o.poor) { Art.rrect(ctx, x, y, w, h, 9); ctx.fillStyle = 'rgba(40,40,40,0.45)'; ctx.fill(); }
-    if (o.key && !o.poor && !(o.cd > 0)) {
+    if (o.key !== undefined && !o.poor && !(o.cd > 0)) {
       this.text(ctx, String(o.key), x + 12, y + 14, 14, { fill: '#fff', stroke: '#333', lw: 3, font: this.BODY, weight: 'bold' });
     }
     ctx.restore();
     if (o.selected) { Art.rrect(ctx, x - 2, y - 2, w + 4, h + 4, 10); ctx.lineWidth = 3; ctx.strokeStyle = '#fff6a0'; ctx.stroke(); }
+  },
+  packetBase(ctx, type, premium) {
+    const x = 0, y = 0, w = 84, h = 116;
+    Art.rrect(ctx, x + 1.5, y + 1.5, w - 3, h - 3, 9);
+    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#fbf6d8'); g.addColorStop(1, '#d6c789');
+    ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#4c6a1c'; ctx.stroke();
+    Art.rrect(ctx, x + 5, y + 5, w - 10, h - 36, 6); ctx.fillStyle = 'rgba(120,180,70,0.22)'; ctx.fill();
+    ctx.save();
+    Art.rrect(ctx, x + 3, y + 3, w - 6, h - 32, 6); ctx.clip();
+    const tall = { tallnut: 0.42, threepeater: 0.46, chomper: 0.44, jalapeno: 0.5, gatling: 0.5, twinsunflower: 0.5, torchwood: 0.48, melonpult: 0.5, wintermelon: 0.5, magnet: 0.5, doomshroom: 0.5, iceshroom: 0.54, garlic: 0.6, spikeweed: 0.7 }[type] || 0.56;
+    ctx.translate(x + w / 2 - 2, y + h - 38); ctx.scale(tall, tall);
+    Art.plant(ctx, type, 0, { armed: true });
+    ctx.restore();
+    Art.rrect(ctx, x + 10, y + h - 30, w - 20, 24, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#8a7a40'; ctx.stroke();
+    this.text(ctx, String(PLANTS[type].cost), x + w / 2, y + h - 17, 20, { fill: '#222', stroke: null, font: this.FONT });
+    if (premium) {
+      ctx.save(); Art.rrect(ctx, x, y, w, h, 9); ctx.clip();
+      ctx.translate(x + w - 18, y + 16); ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = '#e8b81a'; ctx.fillRect(-40, -9, 80, 18);
+      ctx.fillStyle = '#7a4a00'; ctx.fillRect(-40, -9, 80, 2); ctx.fillRect(-40, 7, 80, 2);
+      this.text(ctx, 'GRATIS', 0, 1, 11, { fill: '#fff', stroke: '#7a4a00', lw: 3, font: this.BODY, weight: 'bold' });
+      ctx.restore();
+    }
   },
 
   shovel(ctx, x, y, s) {
