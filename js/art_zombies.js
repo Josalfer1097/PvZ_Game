@@ -190,8 +190,16 @@
     ctx.beginPath(); ctx.moveTo(-14 - L.eye + 1, ey); ctx.lineTo(-17, ey + 1); ctx.moveTo(-14 + L.eye - 1, ey - 2); ctx.lineTo(-11, ey - 1); ctx.stroke();
     const pc = angry ? '#c01a10' : '#141414';
     const look = opts.dead ? 0 : Math.sin((z.animT || 0) * 0.7) * 1.2;
-    circle(ctx, -16.5 + look, ey + 0.5, angry ? 3 : 2.2); ctx.fillStyle = pc; ctx.fill();
-    circle(ctx, 0.5 + look, ey + 0.5, angry ? 2.5 : 1.9); ctx.fill();
+    // iris brillante estilo anime
+    const ic = angry ? ['#ffb0a0', '#e0201a', '#5a0000'] : (L.iris || ['#f4ff9a', '#9ab81a', '#3a4a00']);
+    for (const [ix, r] of [[-16.5 + look, L.eye * 0.62], [0.5 + look, L.eye * 0.5]]) {
+      ell(ctx, ix, ey + 0.5, r * 0.85, r); ctx.fillStyle = lg(ctx, ix, ey - r, ix, ey + r, ic[2], ic[1], ic[0]); ctx.fill();
+      ell(ctx, ix, ey + 0.8, r * 0.38, r * 0.5); ctx.fillStyle = pc; ctx.fill();
+      ctx.fillStyle = '#fff'; circle(ctx, ix - r * 0.32, ey - r * 0.35, r * 0.28); ctx.fill(); circle(ctx, ix + r * 0.3, ey + r * 0.4, r * 0.12); ctx.fill();
+    }
+    ctx.strokeStyle = '#1a1210'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(-14, ey, L.eye, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+    ctx.beginPath(); ctx.arc(3, ey, L.eye * 0.8, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
     if (opts.dead) {
       ctx.strokeStyle = '#141414'; ctx.lineWidth = 2;
       for (const [x, r] of [[-14, 4], [3, 3.4]]) { ctx.beginPath(); ctx.moveTo(x - r, ey - r); ctx.lineTo(x + r, ey + r); ctx.moveTo(x + r, ey - r); ctx.lineTo(x - r, ey + r); ctx.stroke(); }

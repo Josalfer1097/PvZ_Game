@@ -53,7 +53,7 @@ const Art = (() => {
   }
   function fs(ctx, fill, stroke = OUT, lw = 3) {
     ctx.fillStyle = typeof fill === 'string' && fill[0] === '#' ? C(fill) : fill; ctx.fill();
-    if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = C(stroke); ctx.stroke(); }
+    if (stroke) { ctx.lineWidth = lw * 0.82; ctx.lineJoin = 'round'; ctx.strokeStyle = C(stroke); ctx.stroke(); }
   }
   function circle(ctx, x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); }
   function ell(ctx, x, y, rx, ry, rot = 0) { ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), rot, 0, TAU); }
@@ -97,18 +97,31 @@ const Art = (() => {
     ctx.strokeStyle = 'rgba(20,60,10,0.4)'; ctx.lineWidth = 1.3; ctx.stroke();
     ctx.restore();
   }
+  // Ojos de estilo anime: iris con degradado, pupila, doble brillo y línea de pestañas
+  const DEF_IRIS = ['#ffd27a', '#a85a12', '#5a2a04'];
+  let iris = DEF_IRIS;
+  function setIris(c) { iris = c || DEF_IRIS; }
   function eye(ctx, x, y, rx, ry, px, py, pr) {
-    ell(ctx, x, y, rx, ry); fs(ctx, '#fff', '#111', 2);
+    ell(ctx, x, y, rx, ry); fs(ctx, '#fffdf8', '#2a1a20', 1.5);
     ctx.save(); ell(ctx, x, y, rx, ry); ctx.clip();
-    ctx.fillStyle = 'rgba(60,80,120,0.22)'; ell(ctx, x, y - ry * 0.75, rx * 1.2, ry * 0.5); ctx.fill();
+    ctx.fillStyle = 'rgba(90,90,150,0.3)'; ell(ctx, x, y - ry * 0.78, rx * 1.3, ry * 0.55); ctx.fill();
+    const ir = Math.min(pr * 1.7, ry * 0.95);
+    ell(ctx, px, py, ir * 0.82, ir);
+    ctx.fillStyle = lg(ctx, px, py - ir, px, py + ir, iris[2], iris[1], iris[0]); ctx.fill();
+    ctx.strokeStyle = C(iris[2]); ctx.lineWidth = 0.9; ctx.stroke();
+    ell(ctx, px, py + ir * 0.06, ir * 0.36, ir * 0.5); ctx.fillStyle = '#120608'; ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ell(ctx, px, py + ir * 0.6, ir * 0.55, ir * 0.22); ctx.fill();
+    ctx.fillStyle = '#fff'; ell(ctx, px - ir * 0.3, py - ir * 0.42, ir * 0.3, ir * 0.24, -0.4); ctx.fill();
+    circle(ctx, px + ir * 0.34, py + ir * 0.36, ir * 0.12); ctx.fill();
     ctx.restore();
-    circle(ctx, px, py, pr); ctx.fillStyle = '#141414'; ctx.fill();
-    circle(ctx, px, py, pr * 0.55); ctx.fillStyle = '#000'; ctx.fill();
-    circle(ctx, px - pr * 0.35, py - pr * 0.4, pr * 0.38); ctx.fillStyle = '#fff'; ctx.fill();
-    circle(ctx, px + pr * 0.35, py + pr * 0.35, pr * 0.16); ctx.fill();
+    // pestañas superiores
+    ctx.beginPath(); ctx.ellipse(x, y, rx * 1.03, ry * 1.02, 0, Math.PI * 1.1, Math.PI * 1.92);
+    ctx.strokeStyle = '#1a0c10'; ctx.lineWidth = Math.max(1.8, ry * 0.3); ctx.lineCap = 'round'; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + rx * 0.82, y - ry * 0.55); ctx.quadraticCurveTo(x + rx * 1.15, y - ry * 0.8, x + rx * 1.3, y - ry * 0.75);
+    ctx.lineWidth = Math.max(1.2, ry * 0.18); ctx.stroke();
   }
   // Sombra en media luna dentro de una forma redonda (volumen tipo dibujo animado)
-  function crescent(ctx, x, y, rx, ry, a = 0.22, ox = 0.3, oy = 0.34, col = '0,0,0') {
+  function crescent(ctx, x, y, rx, ry, a = 0.22, ox = 0.3, oy = 0.34, col = '70,30,110') {
     ctx.save();
     ell(ctx, x, y, rx, ry); ctx.clip();
     ctx.beginPath(); ctx.rect(x - rx * 2, y - ry * 2, rx * 4, ry * 4);
@@ -252,9 +265,8 @@ const Art = (() => {
     crescent(ctx, 0, 0, 23, 23, 0.25);
     rim(ctx, 0, 0, 23, 23, 3.6, 4.6, 0.35);
     // cara
-    ell(ctx, -8, -5, 4, 6.5); ctx.fillStyle = '#111'; ctx.fill();
-    ell(ctx, 8, -5, 4, 6.5); ctx.fill();
-    ctx.fillStyle = '#fff'; circle(ctx, -9, -8, 1.6); ctx.fill(); circle(ctx, 7, -8, 1.6); ctx.fill();
+    eye(ctx, -8, -5, 5, 6.5, -7.5, -4.5, 3.2);
+    eye(ctx, 8, -5, 5, 6.5, 8.5, -4.5, 3.2);
     ctx.beginPath(); ctx.arc(0, 3, 9, 0.15 * Math.PI, 0.85 * Math.PI);
     ctx.strokeStyle = '#111'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.stroke();
     ctx.fillStyle = 'rgba(255,110,90,0.35)'; ell(ctx, -14, 5, 5, 3); ctx.fill(); ell(ctx, 14, 5, 5, 3); ctx.fill();
@@ -668,7 +680,18 @@ const Art = (() => {
   }
 
   // Dibuja una planta con origen en el centro del suelo
+  const IRIS = {
+    peashooter: ['#c8ffb0', '#2a9a5a', '#0a3a1a'], repeater: ['#ffe080', '#c86a10', '#4a1a00'], snowpea: ['#e8fbff', '#3a9ae0', '#0a2a5a'],
+    threepeater: ['#c8ffb0', '#2a9a5a', '#0a3a1a'], gatling: ['#ffb0a0', '#c02a1a', '#4a0800'], sunflower: ['#ffe8a0', '#c87a1a', '#4a2000'], twinsunflower: ['#ffe8a0', '#c87a1a', '#4a2000'], bloodrose: ['#ffb0b0', '#c0102a', '#3a0008'],
+    cherrybomb: ['#ffd0a0', '#e04a1a', '#5a0a00'], wallnut: ['#a8e0ff', '#2a6ab0', '#0a1a4a'], tallnut: ['#a8e0ff', '#2a6ab0', '#0a1a4a'],
+    potatomine: ['#ffe0a0', '#b0601a', '#3a1a00'], squash: ['#ffe080', '#b0801a', '#3a2a00'], jalapeno: ['#fff0a0', '#e0a01a', '#5a2a00'],
+    garlic: ['#e0c8ff', '#8a4ad8', '#2a0a5a'], torchwood: ['#ffe080', '#e06a10', '#5a1a00'], iceshroom: ['#e8fbff', '#3a9ae0', '#0a2a5a'],
+    doomshroom: ['#ffb0ff', '#c02ad8', '#3a0050'], melonpult: ['#c8ffb0', '#2a9a5a', '#0a3a1a'], wintermelon: ['#e8fbff', '#3a9ae0', '#0a2a5a'],
+    demon: ['#fff0a0', '#ffb020', '#7a3000'], demongirl: ['#ffc8f0', '#e04aa8', '#5a0a3a'], lilith: ['#ffb0b0', '#e0102a', '#4a0008'],
+    gargoyle: ['#ffe0a0', '#ff9a20', '#5a2a00'], endurian: ['#f0ffa0', '#9ab010', '#2a3a00'], bonkchoy: ['#d0ffb0', '#3a9a2a', '#0a3a0a'],
+  };
   function plant(ctx, type, t, s = {}) {
+    setIris(IRIS[type]);
     switch (type) {
       case 'peashooter': return peashooter(ctx, t, s, 'pea');
       case 'snowpea': return peashooter(ctx, t, s, 'snow');
@@ -761,7 +784,7 @@ const Art = (() => {
 
   return {
     TAU, OUT, PAL, setTint, C, rgb, rg, lg, fs, circle, ell, rrect, shadow, line, leaf, eye, highlight, flame,
-    crescent, rim, speckles, peaHead, sunHead, shroomStem,
+    crescent, rim, speckles, peaHead, sunHead, shroomStem, setIris,
     plant, pea, melonFruit, sun, mower,
   };
 })();

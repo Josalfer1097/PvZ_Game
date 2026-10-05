@@ -29,40 +29,64 @@ const UI = {
     ctx.fillStyle = fill; ctx.fillText(str, x, y);
   },
 
+  // Botón estilo «pastilla» elegante: crema con icono de color y borde dorado al pasar
   button(ctx, x, y, w, h, label, fn, o = {}) {
     const { size = 30, color = 'green', disabled = false } = o;
     const over = !disabled && this.isOver(x, y, w, h);
-    const pal = {
-      green: ['#9be05a', '#4f9a22', '#25520c'],
-      red: ['#ff8a6a', '#d0361a', '#5a1005'],
-      orange: ['#ffcf6a', '#e08a1a', '#5a3005'],
-      stone: ['#c9c9c0', '#7d7d74', '#2e2e28'],
-    }[color];
+    const icon = { green: ['#6bc25a', '#2e7a2a'], red: ['#e8604a', '#9a2a1a'], orange: ['#f0b44a', '#a8641a'], stone: ['#9aa2b4', '#4e566a'] }[color];
+    const r = h / 2;
     ctx.save();
-    if (over) { ctx.translate(x + w / 2, y + h / 2); ctx.scale(1.04, 1.04); ctx.translate(-(x + w / 2), -(y + h / 2)); }
-    Art.rrect(ctx, x, y + 5, w, h, h * 0.3); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
-    Art.rrect(ctx, x, y, w, h, h * 0.3);
+    if (over) { ctx.translate(x + w / 2, y + h / 2); ctx.scale(1.03, 1.03); ctx.translate(-(x + w / 2), -(y + h / 2)); }
+    Art.rrect(ctx, x + 2, y + 5, w, h, r); ctx.fillStyle = 'rgba(10,12,24,0.35)'; ctx.fill();
+    if (over) { ctx.save(); ctx.shadowColor = 'rgba(255,230,160,0.9)'; ctx.shadowBlur = 18; Art.rrect(ctx, x, y, w, h, r); ctx.fillStyle = '#fff5dc'; ctx.fill(); ctx.restore(); }
+    Art.rrect(ctx, x, y, w, h, r);
     const g = ctx.createLinearGradient(0, y, 0, y + h);
-    g.addColorStop(0, disabled ? '#999' : pal[0]); g.addColorStop(1, disabled ? '#555' : pal[1]);
+    if (disabled) { g.addColorStop(0, '#8a8e98'); g.addColorStop(1, '#5e626c'); }
+    else { g.addColorStop(0, '#f6f0e4'); g.addColorStop(1, '#d9cfbc'); }
     ctx.fillStyle = g; ctx.fill();
-    ctx.lineWidth = 4; ctx.strokeStyle = disabled ? '#333' : pal[2]; ctx.stroke();
-    Art.rrect(ctx, x + 6, y + 4, w - 12, h * 0.38, h * 0.2); ctx.fillStyle = `rgba(255,255,255,${over ? 0.35 : 0.22})`; ctx.fill();
-    this.text(ctx, label, x + w / 2, y + h / 2 + 2, size, { fill: disabled ? '#ccc' : '#fff', stroke: disabled ? '#333' : pal[2], lw: size / 5 });
+    ctx.lineWidth = 2; ctx.strokeStyle = over ? '#ffe6a8' : 'rgba(80,70,50,0.35)'; ctx.stroke();
+    // icono redondo a la izquierda
+    const cx = x + r, cy = y + h / 2, ir = r * 0.62;
+    ctx.beginPath(); ctx.arc(cx, cy, ir, 0, Math.PI * 2);
+    const ig = ctx.createRadialGradient(cx - ir * 0.3, cy - ir * 0.3, 1, cx, cy, ir);
+    ig.addColorStop(0, disabled ? '#aaa' : icon[0]); ig.addColorStop(1, disabled ? '#666' : icon[1]);
+    ctx.fillStyle = ig; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.moveTo(cx, cy - ir * 0.55); ctx.lineTo(cx + ir * 0.4, cy); ctx.lineTo(cx, cy + ir * 0.55); ctx.lineTo(cx - ir * 0.4, cy); ctx.closePath(); ctx.fill();
+    this.text(ctx, label, x + h * 0.9 + (w - h * 0.9) / 2, y + h / 2 + 1, Math.min(size * 0.92, (w - h) / Math.max(4, label.length) * 1.9), { fill: disabled ? '#2a2e38' : '#3b4255', stroke: null, font: this.FONT });
     ctx.restore();
     if (!disabled) this.region(x, y, w, h, fn);
   },
 
+  // Panel azul noche translúcido con ribetes dorados y adornos en las esquinas
   panel(ctx, x, y, w, h) {
-    Art.rrect(ctx, x, y + 8, w, h, 26); ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fill();
-    Art.rrect(ctx, x, y, w, h, 26);
-    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#8c5c2e'); g.addColorStop(1, '#5a3614');
-    ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 6; ctx.strokeStyle = '#2a1605'; ctx.stroke();
-    ctx.save(); Art.rrect(ctx, x, y, w, h, 26); ctx.clip();
-    ctx.globalAlpha = 0.18; ctx.fillStyle = '#000';
-    for (let yy = y + 30; yy < y + h; yy += 44) ctx.fillRect(x, yy, w, 3);
+    Art.rrect(ctx, x, y + 10, w, h, 22); ctx.fillStyle = 'rgba(0,0,0,0.38)'; ctx.fill();
+    Art.rrect(ctx, x, y, w, h, 22);
+    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, 'rgba(46,54,78,0.97)'); g.addColorStop(1, 'rgba(22,26,40,0.97)');
+    ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#d3bc8e'; ctx.stroke();
+    ctx.save(); Art.rrect(ctx, x, y, w, h, 22); ctx.clip();
+    const lg2 = ctx.createRadialGradient(x + w / 2, y - h * 0.2, 10, x + w / 2, y, w * 0.7);
+    lg2.addColorStop(0, 'rgba(255,230,170,0.16)'); lg2.addColorStop(1, 'rgba(255,230,170,0)');
+    ctx.fillStyle = lg2; ctx.fillRect(x, y, w, h);
     ctx.restore();
-    Art.rrect(ctx, x + 12, y + 12, w - 24, h - 24, 18); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,220,160,0.35)'; ctx.stroke();
+    Art.rrect(ctx, x + 10, y + 10, w - 20, h - 20, 16); ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(211,188,142,0.45)'; ctx.stroke();
+    // adornos de esquina
+    ctx.fillStyle = '#e8d3a0';
+    for (const [cx, cy] of [[x + 10, y + 10], [x + w - 10, y + 10], [x + 10, y + h - 10], [x + w - 10, y + h - 10]]) {
+      ctx.beginPath(); ctx.moveTo(cx, cy - 8); ctx.lineTo(cx + 8, cy); ctx.lineTo(cx, cy + 8); ctx.lineTo(cx - 8, cy); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2); ctx.fillStyle = '#2e364e'; ctx.fill(); ctx.fillStyle = '#e8d3a0';
+    }
+    ctx.strokeStyle = 'rgba(211,188,142,0.6)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x + w / 2 - 90, y + 4); ctx.lineTo(x + w / 2 + 90, y + 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + w / 2, y - 6); ctx.lineTo(x + w / 2 + 10, y + 4); ctx.lineTo(x + w / 2, y + 14); ctx.lineTo(x + w / 2 - 10, y + 4); ctx.closePath();
+    ctx.fillStyle = '#e8d3a0'; ctx.fill();
   },
+  star(ctx, x, y, r, col = '#ffd45a') {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+    ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(90,50,0,0.6)'; ctx.stroke();
+  },
+  rarity(type) { const c = PLANTS[type] ? PLANTS[type].cost : 100; return c <= 75 ? 3 : c <= 175 ? 4 : 5; },
 
   packetCache: {},
   // El dibujo base del sobre se guarda como imagen a la resolución real
@@ -100,21 +124,37 @@ const UI = {
   },
   packetBase(ctx, type, premium) {
     const x = 0, y = 0, w = 84, h = 116;
+    const rar = this.rarity(type);
     const goth = PLANTS[type] && PLANTS[type].origin === 'gothic';
-    Art.rrect(ctx, x + 1.5, y + 1.5, w - 3, h - 3, 9);
-    const g = ctx.createLinearGradient(0, y, 0, y + h);
-    if (goth) { g.addColorStop(0, '#4a2048'); g.addColorStop(1, '#14060f'); } else { g.addColorStop(0, '#fbf6d8'); g.addColorStop(1, '#d6c789'); }
-    ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = goth ? '#b0203a' : '#4c6a1c'; ctx.stroke();
-    Art.rrect(ctx, x + 5, y + 5, w - 10, h - 36, 6); ctx.fillStyle = goth ? 'rgba(160,30,80,0.25)' : 'rgba(120,180,70,0.22)'; ctx.fill();
-    if (goth) { ctx.strokeStyle = 'rgba(230,180,90,0.6)'; ctx.lineWidth = 1.2; Art.rrect(ctx, x + 4, y + 4, w - 8, h - 8, 7); ctx.stroke(); }
+    const bg = { 3: ['#5a7cb0', '#2b3d63'], 4: ['#8a66c8', '#3c2c6a'], 5: ['#d4a258', '#7a4a1e'] }[rar];
+    Art.rrect(ctx, x + 1.5, y + 1.5, w - 3, h - 3, 8);
+    const g = ctx.createLinearGradient(0, y, 0, y + h - 26); g.addColorStop(0, bg[0]); g.addColorStop(1, bg[1]);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.save(); Art.rrect(ctx, x + 1.5, y + 1.5, w - 3, h - 3, 8); ctx.clip();
+    // brillo radial detrás de la planta y destellos
+    const rg2 = ctx.createRadialGradient(w / 2, h * 0.42, 4, w / 2, h * 0.42, 44);
+    rg2.addColorStop(0, 'rgba(255,255,240,0.45)'); rg2.addColorStop(1, 'rgba(255,255,240,0)');
+    ctx.fillStyle = rg2; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.moveTo(w / 2, h * 0.42); ctx.lineTo(w / 2 + Math.cos(i * 0.8) * 70, h * 0.42 + Math.sin(i * 0.8) * 70); ctx.stroke(); }
+    if (goth) { const gg = ctx.createLinearGradient(0, 0, w, h); gg.addColorStop(0, 'rgba(120,0,40,0.45)'); gg.addColorStop(0.6, 'rgba(120,0,40,0)'); ctx.fillStyle = gg; ctx.fillRect(0, 0, w, h); }
+    ctx.restore();
+    // planta
     ctx.save();
-    Art.rrect(ctx, x + 3, y + 3, w - 6, h - 32, 6); ctx.clip();
-    const tall = { tallnut: 0.42, threepeater: 0.46, chomper: 0.44, jalapeno: 0.5, gatling: 0.5, twinsunflower: 0.5, torchwood: 0.48, melonpult: 0.5, wintermelon: 0.5, magnet: 0.5, doomshroom: 0.5, iceshroom: 0.54, garlic: 0.6, spikeweed: 0.7 }[type] || 0.56;
-    ctx.translate(x + w / 2 - 2, y + h - 38); ctx.scale(tall, tall);
+    Art.rrect(ctx, x + 3, y + 3, w - 6, h - 30, 6); ctx.clip();
+    const tall = { tallnut: 0.42, threepeater: 0.46, chomper: 0.44, jalapeno: 0.5, gatling: 0.5, twinsunflower: 0.5, torchwood: 0.48, melonpult: 0.5, wintermelon: 0.5, magnet: 0.5, doomshroom: 0.5, iceshroom: 0.54, garlic: 0.6, spikeweed: 0.7,
+      fallenangel: 0.42, lilith: 0.42, reaper: 0.44, wraith: 0.44, demon: 0.48, demongirl: 0.46, gargoyle: 0.48 }[type] || 0.56;
+    ctx.translate(x + w / 2 - 2, y + h - 34); ctx.scale(tall, tall);
     Art.plant(ctx, type, 0, { armed: true });
     ctx.restore();
-    Art.rrect(ctx, x + 10, y + h - 30, w - 20, 24, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#8a7a40'; ctx.stroke();
-    this.text(ctx, String(PLANTS[type].cost), x + w / 2, y + h - 17, 20, { fill: '#222', stroke: null, font: this.FONT });
+    // estrellas de rareza
+    for (let i = 0; i < rar; i++) this.star(ctx, w / 2 + (i - (rar - 1) / 2) * 11, h - 33, 5);
+    // franja inferior color crema con el coste
+    ctx.save(); Art.rrect(ctx, x + 1.5, y + 1.5, w - 3, h - 3, 8); ctx.clip();
+    ctx.fillStyle = '#ece5d8'; ctx.fillRect(0, h - 26, w, 26);
+    ctx.restore();
+    this.text(ctx, String(PLANTS[type].cost), x + w / 2, y + h - 13, 19, { fill: '#3b4255', stroke: null, font: this.FONT });
+    Art.rrect(ctx, x + 1.5, y + 1.5, w - 3, h - 3, 8); ctx.lineWidth = 2; ctx.strokeStyle = goth ? '#e05a7a' : '#efe2c2'; ctx.stroke();
     if (premium) {
       ctx.save(); Art.rrect(ctx, x, y, w, h, 9); ctx.clip();
       ctx.translate(x + w - 18, y + 16); ctx.rotate(Math.PI / 4);

@@ -109,6 +109,8 @@ const PLANTS = {
   moonflower:  { name: 'Girasol lunar', kind: 'sun', cost: 50, cd: 7.5, hp: 300, ready: true, origin: 'new',
                  desc: 'Produce más rápido que el Girasol y, de noche, el doble.' },
   // --- Reino Gótico (inventadas, con habilidades únicas) ---
+  wraith:      { name: 'Espectro', kind: 'shooter', cost: 50, cd: 7.5, hp: 300, ready: true, origin: 'gothic',
+                 desc: 'Barato y letal: lanza fuego negro que quema a través de cascos y escudos.' },
   demon:       { name: 'Demonio', kind: 'shooter', cost: 175, cd: 7.5, hp: 300, ready: true, origin: 'gothic',
                  desc: 'Lanza fuego infernal que deja el suelo ardiendo bajo los zombis.' },
   fallenangel: { name: 'Ángel caído', kind: 'shooter', cost: 200, cd: 7.5, hp: 300, ready: true, origin: 'gothic',
@@ -139,7 +141,7 @@ const BOWL = {
 const PLANT_ORDER = Object.keys(PLANTS);
 const DEFAULT_PICK = ['sunflower', 'peashooter', 'wallnut', 'cherrybomb', 'snowpea', 'repeater',
   'kernelpult', 'bonkchoy', 'torchwood', 'potatomine'];
-const GOTHIC_PICK = ['bloodrose', 'demon', 'fallenangel', 'reaper', 'lilith', 'demongirl', 'ghostlily', 'widow', 'cursedpumpkin', 'gargoyle'];
+const GOTHIC_PICK = ['bloodrose', 'wraith', 'demon', 'fallenangel', 'reaper', 'lilith', 'demongirl', 'ghostlily', 'cursedpumpkin', 'gargoyle'];
 
 // ====== Zombis ======
 // hp: vida del cuerpo, armor: vida del accesorio, speed: multiplicador, cost: puntos de oleada

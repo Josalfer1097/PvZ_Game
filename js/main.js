@@ -221,7 +221,7 @@ const App = {
     this.dimBg(ctx, world.id, 0.45);
     const px = 120, py = 30, pw = 1360, ph = 840;
     UI.panel(ctx, px, py, pw, ph);
-    UI.text(ctx, 'Mundos', W / 2, py + 48, 50, { fill: '#ffe48a', stroke: '#3a1e05', lw: 9 });
+    UI.text(ctx, 'Mundos', W / 2, py + 48, 50, { fill: '#f0dcaa', stroke: '#141826', lw: 9 });
     // pestañas de mundos
     const tabW = 200;
     WORLDS.forEach((w, i) => {
@@ -270,7 +270,7 @@ const App = {
     this.dimBg(ctx, 'night', 0.45);
     const px = 120, py = 30, pw = 1360, ph = 840;
     UI.panel(ctx, px, py, pw, ph);
-    UI.text(ctx, 'Minijuegos', W / 2, py + 50, 52, { fill: '#ffe48a', stroke: '#3a1e05', lw: 9 });
+    UI.text(ctx, 'Minijuegos', W / 2, py + 50, 52, { fill: '#f0dcaa', stroke: '#141826', lw: 9 });
     const keys = Object.keys(MINIGAMES);
     const cw = 400, chh = 205;
     keys.forEach((k, i) => {
@@ -299,7 +299,7 @@ const App = {
       ctx.restore();
       ctx.lineWidth = 4; ctx.strokeStyle = over ? '#ffe48a' : '#1e1408'; Art.rrect(ctx, cx, cy, cw, chh, 20); ctx.stroke();
       Art.rrect(ctx, cx, cy + chh - 70, cw, 70, 0); ctx.fillStyle = 'rgba(20,12,4,0.8)'; ctx.fill();
-      UI.text(ctx, M.name, cx + cw / 2, cy + chh - 48, 26, { fill: '#ffe48a', stroke: '#1e1408', lw: 6 });
+      UI.text(ctx, M.name, cx + cw / 2, cy + chh - 48, 26, { fill: '#f0dcaa', stroke: '#141826', lw: 6 });
       UI.text(ctx, M.desc, cx + cw / 2, cy + chh - 18, 15, { fill: '#f4ecd0', stroke: null, font: UI.BODY, weight: 'bold' });
       if (d.done.includes('mg:' + k)) UI.text(ctx, '★', cx + 34, cy + 36, 40, { fill: '#ffd23a', stroke: '#4a2a00', lw: 5, font: UI.BODY });
       ctx.restore();
@@ -314,7 +314,7 @@ const App = {
     this.dimBg(ctx, 'night', 0.4);
     const px = 40, py = 20, pw = 1520, ph = 860;
     UI.panel(ctx, px, py, pw, ph);
-    UI.text(ctx, 'Almanaque', px + 330, py + 46, 46, { fill: '#ffe48a', stroke: '#3a1e05', lw: 8 });
+    UI.text(ctx, 'Almanaque', px + 330, py + 46, 46, { fill: '#f0dcaa', stroke: '#141826', lw: 8 });
     UI.button(ctx, px + 40, py + 82, 280, 50, `Plantas (${PLANT_ORDER.length})`, () => { A.tab = 'plants'; A.sel = 'peashooter'; Sfx.play('click'); }, { size: 22, color: A.tab === 'plants' ? 'green' : 'stone' });
     UI.button(ctx, px + 340, py + 82, 280, 50, `Zombis (${ZOMBIE_ORDER.length})`, () => { A.tab = 'zombies'; A.sel = 'normal'; A.z = null; Sfx.play('click'); }, { size: 22, color: A.tab === 'zombies' ? 'red' : 'stone' });
     if (A.tab === 'plants') {
@@ -358,7 +358,7 @@ const App = {
     if (A.tab === 'plants') {
       const d = PLANTS[A.sel];
       const tag = d.origin === 'gothic' ? 'Reino Gótico · habilidad única' : d.origin === 'new' ? '¡Nueva! Inventada para este juego' : d.origin === 2 ? 'Planta de la secuela' : 'Planta clásica';
-      UI.text(ctx, d.name, fx + fw / 2, fy + 520, 48, { fill: '#ffe48a', stroke: '#3a1e05', lw: 8 });
+      UI.text(ctx, d.name, fx + fw / 2, fy + 520, 48, { fill: '#f0dcaa', stroke: '#141826', lw: 8 });
       UI.text(ctx, tag, fx + fw / 2, fy + 562, 20, { fill: '#a8e070', stroke: null, font: UI.BODY, weight: 'bold' });
       UI.text(ctx, d.desc, fx + fw / 2, fy + 610, 23, { fill: '#f4ecd0', stroke: null, font: UI.BODY, weight: 'bold' });
       UI.text(ctx, `Coste: ${d.cost} soles   ·   Recarga: ${d.cd} s   ·   Resistencia: ${d.hp}`, fx + fw / 2, fy + 664, 23, { fill: '#c8e8a0', stroke: null, font: UI.BODY, weight: 'bold' });

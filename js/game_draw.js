@@ -54,11 +54,11 @@ Object.assign(Game.prototype, {
         ctx.save();
         pe.trail.forEach(([tx, ty], i) => {
           ctx.globalAlpha = 0.22 * (1 - i / pe.trail.length);
-          const col = { snow: '#bfefff', fire: '#ffb040', hellfire: '#ff5a20', feather: '#8a6ac8', wisp: '#a8f4ff' }[pe.kind] || '#b8f070';
+          const col = { blackfire: '#7a3ac8', snow: '#bfefff', fire: '#ffb040', hellfire: '#ff5a20', feather: '#8a6ac8', wisp: '#a8f4ff' }[pe.kind] || '#b8f070';
           Art.circle(ctx, tx - 6, ty, 9 - i); ctx.fillStyle = col; ctx.fill();
         });
         ctx.restore();
-        if (pe.kind === 'thorn' || pe.kind === 'hellfire' || pe.kind === 'feather' || pe.kind === 'wisp') Art.projectile(ctx, pe.kind, pe.x, pe.y, 0, t);
+        if (pe.kind === 'thorn' || pe.kind === 'hellfire' || pe.kind === 'feather' || pe.kind === 'wisp' || pe.kind === 'blackfire') Art.projectile(ctx, pe.kind, pe.x, pe.y, 0, t);
         else Art.pea(ctx, pe.x, pe.y, pe.kind, t);
       }
     }
@@ -75,7 +75,7 @@ Object.assign(Game.prototype, {
       Art.projectile(ctx, s.kind, s.x, s.y, s.kind === 'rocket' ? s.rot : (s.rot || 0), t);
     }
     this.drawParts(ctx, false);
-    for (const a of this.ambient) if (a.kind !== 'firefly') Art.ambient(ctx, a, t);
+    for (const a of this.ambient) if (a.kind !== 'firefly' && a.kind !== 'mote') Art.ambient(ctx, a, t);
 
     // iluminación del escenario
     const tint = STAGES[this.stage].tint;
@@ -94,7 +94,7 @@ Object.assign(Game.prototype, {
     }
     if (this.fogCols) Art.fog(ctx, this.fogD, t);
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    for (const a of this.ambient) if (a.kind === 'firefly') Art.ambient(ctx, a, t);
+    for (const a of this.ambient) if (a.kind === 'firefly' || a.kind === 'mote') Art.ambient(ctx, a, t);
     ctx.restore();
     this.drawParts(ctx, true);
 
@@ -341,6 +341,7 @@ Object.assign(Game.prototype, {
           ctx.globalAlpha = (1 - k) * 0.8; ctx.strokeStyle = '#fff2c0'; ctx.lineWidth = 10 * (1 - k);
           Art.ell(ctx, p.x, p.y, p.size * (0.2 + k), p.size * (0.2 + k) * 0.4); ctx.stroke(); break;
         }
+        case 'blackflame': ctx.globalAlpha = 1 - k; Art.blackFlame(ctx, p.x, p.y, this.time, p.size * (1 - k * 0.5), p.x); break;
         case 'spark': ctx.globalCompositeOperation = 'lighter'; Art.glow(ctx, p.x, p.y, p.size * 2, p.color, 1 - k); break;
         case 'heartp': ctx.globalAlpha = 1 - k; Art.heart(ctx, p.x, p.y, p.size, '#ff4a9a'); break;
         case 'pole':
@@ -408,13 +409,13 @@ Object.assign(Game.prototype, {
   drawSeedBar(ctx, t) {
     const bw = this.barW;
     Art.rrect(ctx, BAR.x, BAR.y, bw, BAR.ph + 10, 14);
-    ctx.fillStyle = Art.lg(ctx, 0, BAR.y, 0, BAR.y + BAR.ph, '#8a5a2b', '#5e3a17'); ctx.fill();
-    ctx.lineWidth = 4; ctx.strokeStyle = '#2e1a08'; ctx.stroke();
+    ctx.fillStyle = Art.lg(ctx, 0, BAR.y, 0, BAR.y + BAR.ph, '#343c56', '#1a1f30'); ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = '#d3bc8e'; ctx.stroke();
     ctx.save(); ctx.globalAlpha = 0.2; ctx.fillStyle = '#000';
     for (let i = 0; i < 4; i++) ctx.fillRect(BAR.x + 6, BAR.y + 20 + i * 28, bw - 12, 2);
     ctx.restore();
     Art.rrect(ctx, BAR.x + 8, BAR.y + 8, BAR.sunW - 6, BAR.ph - 6, 10);
-    ctx.fillStyle = '#4a2c10'; ctx.fill();
+    ctx.fillStyle = 'rgba(8,12,24,0.55)'; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(211,188,142,0.5)'; ctx.stroke();
     const pulse = this.sunPulse > 0 ? 1 + this.sunPulse * 0.6 : 1;
     Art.sun(ctx, BAR.x + 58, BAR.y + 46, t, 0.85 * pulse);
     Art.rrect(ctx, BAR.x + 16, BAR.y + 88, BAR.sunW - 22, 30, 8); ctx.fillStyle = '#f6edc8'; ctx.fill();
@@ -441,9 +442,9 @@ Object.assign(Game.prototype, {
     if (this.phase !== 'choose') {
       const s = this.shovelRect();
       Art.rrect(ctx, s.x, s.y, s.w, s.h, 14);
-      ctx.fillStyle = Art.lg(ctx, 0, s.y, 0, s.y + s.h, '#8a5a2b', '#5e3a17'); ctx.fill();
-      ctx.lineWidth = 4; ctx.strokeStyle = '#2e1a08'; ctx.stroke();
-      Art.rrect(ctx, s.x + 8, s.y + 8, s.w - 16, s.h - 16, 10); ctx.fillStyle = '#3e240c'; ctx.fill();
+      ctx.fillStyle = Art.lg(ctx, 0, s.y, 0, s.y + s.h, '#343c56', '#1a1f30'); ctx.fill();
+      ctx.lineWidth = 2.5; ctx.strokeStyle = '#d3bc8e'; ctx.stroke();
+      Art.rrect(ctx, s.x + 8, s.y + 8, s.w - 16, s.h - 16, 10); ctx.fillStyle = 'rgba(8,12,24,0.55)'; ctx.fill();
       if (this.selected !== 'shovel') { ctx.save(); ctx.translate(s.x + s.w / 2, s.y + s.h / 2); ctx.rotate(-0.6); UI.shovel(ctx, 0, 0, 0.9); ctx.restore(); }
       UI.region(s.x, s.y, s.w, s.h, () => { if (this.phase === 'play') { this.selected = this.selected === 'shovel' ? null : 'shovel'; Sfx.play('shovel'); } });
     }
@@ -524,8 +525,8 @@ Object.assign(Game.prototype, {
     ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.38)'; ctx.fillRect(0, BAR.y + BAR.ph + 14, LAWN_RIGHT + 60, H); ctx.restore();
     const px = 190, py = 140, pw = 980, ph = 750;
     UI.panel(ctx, px, py, pw, ph);
-    UI.text(ctx, 'Elige tus plantas', px + pw / 2, py + 40, 44, { fill: '#ffe48a', stroke: '#3a1e05', lw: 8 });
-    UI.text(ctx, `Lleva hasta ${this.slots} · ${PLANT_ORDER.length} plantas, todas desbloqueadas y gratis`, px + pw / 2, py + 80, 21, { fill: '#f7e9c2', stroke: null, font: UI.BODY, weight: 'bold' });
+    UI.text(ctx, 'Elige tus plantas', px + pw / 2, py + 40, 44, { fill: '#f0dcaa', stroke: '#141826', lw: 8 });
+    UI.text(ctx, `Lleva hasta ${this.slots} · ${PLANT_ORDER.length} plantas, todas desbloqueadas y gratis`, px + pw / 2, py + 80, 21, { fill: '#e6dcc6', stroke: null, font: UI.BODY, weight: 'bold' });
     const cols = 13, S = 0.64, cw = 84 * S, chh = 116 * S;
     const pos = i => ({ x: px + 40 + (i % cols) * (cw + 15), y: py + 102 + Math.floor(i / cols) * (chh + 10) });
     let hovered = null;
@@ -544,14 +545,14 @@ Object.assign(Game.prototype, {
     if (hovered) {
       const d = PLANTS[hovered];
       const tag = d.origin === 'gothic' ? ' · Gótica' : d.origin === 'new' ? ' · ¡NUEVA!' : d.origin === 2 ? ' · Secuela' : '';
-      UI.text(ctx, `${d.name} · ${d.cost} soles · recarga ${d.cd}s${tag}`, px + pw / 2, ty, 28, { fill: '#ffe48a', stroke: '#3a1e05', lw: 6 });
-      UI.text(ctx, d.desc, px + pw / 2, ty + 38, 21, { fill: '#f7e9c2', stroke: null, font: UI.BODY, weight: 'bold' });
+      UI.text(ctx, `${d.name} · ${d.cost} soles · recarga ${d.cd}s${tag}`, px + pw / 2, ty, 28, { fill: '#f0dcaa', stroke: '#141826', lw: 6 });
+      UI.text(ctx, d.desc, px + pw / 2, ty + 38, 21, { fill: '#e6dcc6', stroke: null, font: UI.BODY, weight: 'bold' });
     } else {
       const names = this.L.zombies.map(z => ZOMBIES[z].name);
       const half = Math.ceil(names.length / 2);
       const lines = names.length > 4 ? [names.slice(0, half).join(', ') + ',', names.slice(half).join(', ')] : [names.join(', ')];
       UI.text(ctx, 'Zombis en este nivel:', px + pw / 2, ty - 6, 24, { fill: '#ffb8a0', stroke: '#3a1e05', lw: 5 });
-      lines.forEach((ln, i) => UI.text(ctx, ln, px + pw / 2, ty + 28 + i * 27, 20, { fill: '#f7e9c2', stroke: null, font: UI.BODY, weight: 'bold' }));
+      lines.forEach((ln, i) => UI.text(ctx, ln, px + pw / 2, ty + 28 + i * 27, 20, { fill: '#e6dcc6', stroke: null, font: UI.BODY, weight: 'bold' }));
     }
     const ready = this.chosen.length > 0;
     UI.button(ctx, px + pw / 2 - 170, py + ph - 96, 300, 70, '¡A JUGAR!', () => { Sfx.play('go'); this.startReady(); }, { size: 36, disabled: !ready, color: 'red' });
@@ -588,7 +589,7 @@ Object.assign(Game.prototype, {
     ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 0, W, H); ctx.restore();
     const pw = 600, ph = 640, px = W / 2 - pw / 2, py = H / 2 - ph / 2;
     UI.panel(ctx, px, py, pw, ph);
-    UI.text(ctx, 'Pausa', W / 2, py + 58, 56, { fill: '#ffe48a', stroke: '#3a1e05', lw: 9 });
+    UI.text(ctx, 'Pausa', W / 2, py + 58, 56, { fill: '#f0dcaa', stroke: '#141826', lw: 9 });
     let y = py + 110;
     const b = (label, fn, opts = {}) => { UI.button(ctx, px + 70, y, pw - 140, 60, label, fn, Object.assign({ size: 26 }, opts)); y += 72; };
     b('Continuar', () => { this.paused = false; Sfx.play('click'); });

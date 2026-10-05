@@ -406,7 +406,69 @@
     if (dmg > 0) { ctx.strokeStyle = '#1a1a18'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-20, -60); ctx.lineTo(-10, -50); ctx.lineTo(-14, -38); if (dmg > 1) { ctx.moveTo(18, -40); ctx.lineTo(8, -30); ctx.lineTo(14, -20); ctx.moveTo(4, -92); ctx.lineTo(-2, -84); } ctx.stroke(); }
   }
 
-  const GOTHIC_PLANTS = { demon, fallenangel, demongirl, lilith, ghostlily, reaper, widow, cursedpumpkin, bloodrose, gargoyle };
+  // Espectro: fantasma encapuchado que lanza fuego negro
+  function blackFlame(ctx, x, y, t, size, seed = 0) {
+    const layers = [['#120018', 1], ['#3a0a5a', 0.74], ['#8a3ad8', 0.46], ['#e8c8ff', 0.2]];
+    for (let i = 0; i < layers.length; i++) {
+      const [col, k] = layers[i];
+      const w = size * 0.55 * k, h = size * (0.9 + 0.14 * Math.sin(t * 13 + i + seed)) * k + size * 0.15;
+      const tip = Math.sin(t * 9 + i * 1.7 + seed) * size * 0.16;
+      ctx.beginPath(); ctx.moveTo(x - w, y);
+      ctx.bezierCurveTo(x - w * 1.1, y - h * 0.5, x + tip - w * 0.3, y - h * 0.8, x + tip, y - h);
+      ctx.bezierCurveTo(x + tip + w * 0.3, y - h * 0.75, x + w * 1.1, y - h * 0.45, x + w, y);
+      ctx.quadraticCurveTo(x, y + w * 0.4, x - w, y); ctx.closePath();
+      ctx.fillStyle = col; ctx.fill();
+    }
+  }
+  function wraith(ctx, t, s) {
+    const rec = s.recoil || 0, fl = Math.sin(t * 2.2 + (s.seed || 0)) * 5;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(ctx, 0, -70 + fl, 80, '140,60,255', 0.22 + rec * 0.3); ctx.restore();
+    // sombra difusa en el suelo
+    ctx.save(); ctx.globalAlpha *= 0.35; ell(ctx, 0, -2, 30, 7); ctx.fillStyle = '#1a0030'; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(0, fl);
+    // manto hecho jirones (flota)
+    ctx.beginPath(); ctx.moveTo(-26, -96);
+    ctx.bezierCurveTo(-40, -60, -34, -34, -30, -16);
+    for (let i = 0; i <= 8; i++) ctx.lineTo(-30 + i * 7.5, -16 + (i % 2 ? -12 : 6) + Math.sin(t * 5 + i) * 5);
+    ctx.bezierCurveTo(34, -34, 40, -60, 26, -96); ctx.quadraticCurveTo(0, -128, -26, -96); ctx.closePath();
+    fs(ctx, lg(ctx, -36, -110, 36, 0, '#3a2a54', '#14081f', '#05020a'), '#000', 2.5);
+    // pliegues e interior violeta
+    ctx.save(); ctx.clip();
+    ctx.strokeStyle = 'rgba(160,110,230,0.28)'; ctx.lineWidth = 2;
+    for (const x of [-16, -4, 10, 22]) { ctx.beginPath(); ctx.moveTo(x * 0.6, -100); ctx.quadraticCurveTo(x * 1.1, -60, x * 1.2, -14); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.moveTo(-26, -96); ctx.quadraticCurveTo(-30, -60, -22, -20); ctx.lineTo(-14, -20); ctx.quadraticCurveTo(-20, -60, -14, -100); ctx.fill();
+    ctx.restore();
+    // broche de luna plateada
+    ctx.save(); ctx.translate(0, -78);
+    circle(ctx, 0, 0, 6); fs(ctx, rg(ctx, -2, -2, 7, '#ffffff', '#9aa4c8'), '#2a2a48', 1.5);
+    ctx.beginPath(); ctx.arc(1.5, 0, 4.5, 0, TAU); ctx.fillStyle = '#3a2a54'; ctx.fill();
+    ctx.restore();
+    // capucha y rostro vacío
+    ctx.save(); ctx.translate(0, -102);
+    ctx.beginPath(); ctx.moveTo(-24, 14); ctx.bezierCurveTo(-30, -16, -12, -36, 4, -34); ctx.bezierCurveTo(22, -32, 30, -10, 24, 16); ctx.quadraticCurveTo(0, 6, -24, 14); ctx.closePath();
+    fs(ctx, lg(ctx, -24, -34, 24, 16, '#4a3a68', '#120820'), '#000', 2.5);
+    ell(ctx, 2, 0, 15, 15); ctx.fillStyle = '#020005'; ctx.fill();
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    glow(ctx, -4, -2, 11, '170,120,255', 0.95); glow(ctx, 9, -2, 10, '170,120,255', 0.95);
+    ctx.fillStyle = '#efe4ff'; ell(ctx, -4, -2, 3, 1.8); ctx.fill(); ell(ctx, 9, -2, 2.6, 1.6); ctx.fill();
+    ctx.restore();
+    ctx.restore();
+    // manos esqueléticas que conjuran el fuego negro
+    const hx = 30 + rec * 6, hy = -64;
+    ctx.strokeStyle = '#d8d0e8'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(18, -72); ctx.quadraticCurveTo(26, -70, hx, hy); ctx.stroke();
+    for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + 7, hy + k * 4 - 2); ctx.stroke(); }
+    ctx.save(); ctx.globalCompositeOperation = 'source-over';
+    blackFlame(ctx, hx + 8, hy - 2, t, 18 + rec * 14, 2);
+    ctx.restore();
+    // jirones de sombra que se desprenden
+    ctx.save(); ctx.globalAlpha *= 0.5;
+    for (let i = 0; i < 3; i++) { const k = (t * 0.5 + i / 3) % 1; ell(ctx, -20 + i * 18, -10 - k * 60, 6 * (1 - k), 10 * (1 - k)); ctx.fillStyle = '#1a0830'; ctx.fill(); }
+    ctx.restore();
+    ctx.restore();
+  }
+
+  const GOTHIC_PLANTS = { wraith, demon, fallenangel, demongirl, lilith, ghostlily, reaper, widow, cursedpumpkin, bloodrose, gargoyle };
   const baseExtra = Art.extraPlant;
   Art.extraPlant = function (ctx, type, t, s) {
     if (GOTHIC_PLANTS[type]) return GOTHIC_PLANTS[type](ctx, t, s);
@@ -421,6 +483,13 @@
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(ctx, 0, 0, 30, '255,60,20', 0.7); ctx.restore();
       ctx.save(); ctx.rotate(-Math.PI / 2); flame(ctx, 0, 8, t, 26, x * 0.05); ctx.restore();
       circle(ctx, 0, 0, 9); fs(ctx, rg(ctx, 0, 0, 9, '#ffe0a0', '#c01a0a'), '#3a0000', 1.5);
+      ctx.restore(); return;
+    }
+    if (kind === 'blackfire') {
+      ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(ctx, 0, 0, 30, '150,70,255', 0.55); ctx.restore();
+      ctx.save(); ctx.rotate(-Math.PI / 2); blackFlame(ctx, 0, 10, t, 30, x * 0.05); ctx.restore();
+      circle(ctx, 0, 0, 8); fs(ctx, rg(ctx, -2, -2, 9, '#c8a0ff', '#14001e'), '#000', 1.2);
       ctx.restore(); return;
     }
     if (kind === 'feather') {
@@ -457,10 +526,10 @@
   //  ZOMBIS GÓTICOS
   // ==================================================================
   const GL = {
-    vampire:   { skin: ['#efedf8', '#9c98ba'], coat: ['#24202c', '#0a080e'], tie: '#b0101a', pants: ['#24202c', '#0c0a10'] },
-    witch:     { skin: ['#b8e47e', '#5c8c34'], coat: ['#5a2a7a', '#26103a'], tie: '#6a3a8a', pants: ['#2a1a3a', '#140a20'] },
+    vampire:   { skin: ['#efedf8', '#9c98ba'], coat: ['#24202c', '#0a080e'], tie: '#b0101a', pants: ['#24202c', '#0c0a10'], iris: ['#ffb0b0', '#e0101a', '#4a0000'] },
+    witch:     { skin: ['#b8e47e', '#5c8c34'], coat: ['#5a2a7a', '#26103a'], tie: '#6a3a8a', pants: ['#2a1a3a', '#140a20'], iris: ['#e8c0ff', '#9a3ae0', '#2a0050'] },
     gargoylez: { skin: ['#bcbab2', '#62605a'], coat: ['#6e6c66', '#3a3834'], tie: '#4a4844', pants: ['#5a5852', '#34322e'] },
-    archdemon: { skin: ['#ea5a3e', '#7a140c'], coat: ['#2a1410', '#140806'], tie: '#000', pants: ['#2a1410', '#120604'] },
+    archdemon: { skin: ['#ea5a3e', '#7a140c'], coat: ['#2a1410', '#140806'], tie: '#000', pants: ['#2a1410', '#120604'], iris: ['#fff6a0', '#ffb020', '#7a3000'] },
     skeleton:  { skin: ['#f0ead6', '#a8a08a'] },
     ghost:     { skin: ['#e8f8ff', '#80b8d8'] },
   };
@@ -821,11 +890,18 @@
       ctx.fillStyle = '#ff3030'; circle(ctx, -1.5, 0, 0.9); ctx.fill(); circle(ctx, 1.5, 0, 0.9); ctx.fill();
       ctx.restore(); return;
     }
+    if (a.kind === 'mote') {
+      const b = 0.4 + 0.6 * Math.max(0, Math.sin(t * 1.5 + a.seed));
+      glow(ctx, a.x, a.y, 10, '255,245,200', 0.5 * b);
+      ctx.fillStyle = `rgba(255,255,240,${0.8 * b})`; ctx.beginPath();
+      ctx.moveTo(a.x, a.y - 4); ctx.lineTo(a.x + 1, a.y - 1); ctx.lineTo(a.x + 4, a.y); ctx.lineTo(a.x + 1, a.y + 1); ctx.lineTo(a.x, a.y + 4); ctx.lineTo(a.x - 1, a.y + 1); ctx.lineTo(a.x - 4, a.y); ctx.lineTo(a.x - 1, a.y - 1); ctx.closePath(); ctx.fill();
+      return;
+    }
     if (a.kind === 'ember') {
       const b = 0.5 + 0.5 * Math.sin(t * 5 + a.seed);
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(ctx, a.x, a.y, 8, '255,90,40', 0.6 * b); ctx.restore(); return;
     }
     return baseAmb(ctx, a, t);
   };
-  Object.assign(Art, { heart, glow });
+  Object.assign(Art, { heart, glow, blackFlame });
 })();

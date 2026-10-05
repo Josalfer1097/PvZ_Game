@@ -84,6 +84,8 @@ class Game {
     const st = this.stage;
     const kind = st === 'night' || st === 'fog' ? 'firefly' : st === 'dusk' ? 'leaf' : st === 'egypt' ? 'sand' : st === 'gothic' ? 'bat' : 'butterfly';
     const n = kind === 'firefly' ? 16 : kind === 'leaf' ? 10 : kind === 'sand' ? 26 : kind === 'bat' ? 7 : 5;
+    // motas de luz flotantes (ambiente de fantasía)
+    for (let i = 0; i < 12; i++) this.ambient.push({ kind: 'mote', x: rand(GRID_X, LAWN_RIGHT), y: rand(GRID_Y, H), vx: rand(-8, 8), vy: rand(-18, -6), seed: rand(0, 10) });
     if (kind === 'bat') for (let i = 0; i < 14; i++) this.ambient.push({ kind: 'ember', x: rand(GRID_X, LAWN_RIGHT), y: rand(GRID_Y, H), vx: rand(-10, 10), vy: rand(-30, -10), seed: rand(0, 10) });
     for (let i = 0; i < n; i++) {
       this.ambient.push({
@@ -187,7 +189,8 @@ class Game {
 
   updateAmbient(dt) {
     for (const a of this.ambient) {
-      if (a.kind === 'ember') { a.vy = -20 - Math.sin(this.time + a.seed) * 10; a.vx = Math.sin(this.time * 0.7 + a.seed) * 15; if (a.y < GRID_Y - 40) a.y = H; }
+      if (a.kind === 'mote') { a.vy = -10 - Math.sin(this.time + a.seed) * 6; a.vx = Math.sin(this.time * 0.5 + a.seed) * 10; if (a.y < GRID_Y - 40) a.y = H; }
+      else if (a.kind === 'ember') { a.vy = -20 - Math.sin(this.time + a.seed) * 10; a.vx = Math.sin(this.time * 0.7 + a.seed) * 15; if (a.y < GRID_Y - 40) a.y = H; }
       else if (a.kind === 'leaf') { a.vx = 25 + Math.sin(this.time + a.seed) * 15; a.vy = 30; }
       else if (a.kind === 'sand') { a.vx = 90 + Math.sin(this.time * 2 + a.seed) * 30; a.vy = Math.sin(this.time * 3 + a.seed) * 15; }
       else { a.vx += rand(-60, 60) * dt; a.vy += rand(-60, 60) * dt; a.vx = clamp(a.vx, -35, 35); a.vy = clamp(a.vy, -25, 25); }
@@ -399,7 +402,7 @@ class Game {
         const target = rows.some(r => this.zombieAhead(r, p.x));
         if (p.fireT <= 0 && target) {
           p.fireT = T === 'fallenangel' ? 1.5 : T === 'demon' ? 1.5 : 1.4; p.recoil = 1;
-          const kind = T === 'snowpea' ? 'snow' : T === 'firepea' ? 'fire' : T === 'thornrose' ? 'thorn' : T === 'demon' ? 'hellfire' : T === 'fallenangel' ? 'feather' : T === 'ghostlily' ? 'wisp' : 'pea';
+          const kind = T === 'snowpea' ? 'snow' : T === 'firepea' ? 'fire' : T === 'thornrose' ? 'thorn' : T === 'demon' ? 'hellfire' : T === 'fallenangel' ? 'feather' : T === 'ghostlily' ? 'wisp' : T === 'wraith' ? 'blackfire' : 'pea';
           if (T === 'threepeater') rows.forEach(r => this.firePea(p, r, 'pea'));
           else {
             this.firePea(p, p.row, kind);
@@ -720,10 +723,10 @@ class Game {
   }
 
   firePea(p, row, kind) {
-    const dmg = { fire: 40, hellfire: 40, feather: 30, wisp: 30 }[kind] || 20;
+    const dmg = { fire: 40, hellfire: 40, feather: 30, wisp: 30, blackfire: 20 }[kind] || 20;
     this.peas.push({ x: p.x + 42, y: p.y - 64 - (kind === 'wisp' ? 10 : 0), ty: rowGroundY(row) - 64, row, kind, dmg, dead: false,
       torched: new Set(), pierce: kind === 'thorn' ? 3 : kind === 'feather' ? 99 : 1, hit: new Set(), trail: [] });
-    Sfx.play(kind === 'fire' || kind === 'hellfire' ? 'firepea' : kind === 'wisp' ? 'freeze' : 'shoot');
+    Sfx.play(kind === 'fire' || kind === 'hellfire' || kind === 'blackfire' ? 'firepea' : kind === 'wisp' ? 'freeze' : 'shoot');
   }
   lobTarget(p) {
     let best = null;
@@ -907,6 +910,11 @@ class Game {
     if (z.state === 'rise') { z.riseT += dt / 1.3; if (z.riseT >= 1) z.state = 'walk'; return; }
     if (z.state === 'bones') { z.reviveT += dt; if (z.reviveT >= 3) { z.state = 'walk'; z.hp = Math.round(z.maxHp * 0.6); z.headless = false; Sfx.play('groan'); } return; }
     if (z.webT > 0) z.webT -= dt;
+    if (z.burnT > 0 && this.alive(z)) {
+      z.burnT -= dt; z.burnTick = (z.burnTick || 0) - dt;
+      if (z.burnTick <= 0) { z.burnTick = 0.5; this.hitZombie(z, 3, 'true'); }
+      if (Math.random() < dt * 8) this.addPart({ kind: 'blackflame', x: z.x + rand(-20, 20), y: z.y - rand(30, 150), vx: rand(-10, 10), vy: rand(-70, -30), life: 0.6, size: rand(10, 18) });
+    }
     if (z.castT > 0) z.castT -= dt;
     if (z.type === 'ghost') { z.phaseT = (z.phaseT || 0) + dt; z.ethereal = (z.phaseT % 4.6) > 2.8; }
     if (z.state === 'blown') { z.x += z.vx * dt; z.animT += dt; if (z.x > W + 200) z.removed = true; return; }
@@ -1105,6 +1113,7 @@ class Game {
           this.hitZombie(best, pe.dmg, 'pea');
           for (const z of this.rowZombies(pe.row)) if (z !== best && Math.abs(z.x - best.x) < 60) this.hitZombie(z, 13, 'explosion');
         } else if (pe.kind === 'wisp') this.hitZombie(best, pe.dmg, 'true');
+        else if (pe.kind === 'blackfire') { this.hitZombie(best, pe.dmg, 'pea'); if (this.alive(best)) best.burnT = 3; }
         else if (pe.kind === 'hellfire') { this.hitZombie(best, pe.dmg, 'pea'); this.patches.push({ row: pe.row, x: best.x - 10, t: 3, tick: 0 }); }
         else this.hitZombie(best, pe.dmg, 'pea', pe.kind === 'snow');
         this.splat(pe);
