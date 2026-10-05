@@ -28,7 +28,9 @@
   function gait(z) {
     const t = z.type;
     if (t === 'imp') return { freq: 10, stride: 0.55, lean: -0.15, hop: 7 };
-    if (t === 'gargantuar') return { freq: 2.6, stride: 0.33, lean: -0.1, hop: 0 };
+    if (t === 'gargantuar' || t === 'archdemon') return { freq: 2.6, stride: 0.33, lean: -0.1, hop: 0 };
+    if (t === 'skeleton') return { freq: 6, stride: 0.5, lean: -0.12, hop: 0 };
+    if (t === 'vampire') return { freq: 5, stride: 0.48, lean: -0.15, hop: 0 };
     if ((t === 'pole' && z.hasPole) || t === 'football' || z.enraged) return { freq: 8.5, stride: 0.72, lean: -0.26, hop: 0 };
     if (t === 'flag') return { freq: 4.8, stride: 0.45, lean: -0.08, hop: 0 };
     return { freq: 4, stride: 0.42, lean: -0.07, hop: 0 };
@@ -373,14 +375,15 @@
   // ==================================================================
   function zombie(ctx, z, t) {
     const type = z.type;
-    const L = z.look || DEFAULT_LOOK;
+    const L = z.look || (Art.defaultLook ? Art.defaultLook(type) : DEFAULT_LOOK);
     const g = gait(z);
     const state = z.state;
     const moving = state === 'walk' || state === 'lane';
     const eating = state === 'eat';
     const dying = state === 'dying';
     const ph = (z.animT || 0) * g.freq + L.phase;
-    const isImp = type === 'imp', isGarg = type === 'gargantuar';
+    const isImp = type === 'imp', isGarg = type === 'gargantuar' || type === 'archdemon';
+    const hook = (stage, extra) => Art.zHook ? Art.zHook(stage, ctx, z, t, extra) : false;
     const big = isGarg ? 1.75 : isImp ? 0.66 : 1;
 
     // dimensiones
@@ -395,7 +398,7 @@
     if (type === 'mummy' || type === 'pharaoh') { coat = ['#e2d6b0', '#a89a70']; sleeve = coat[0]; sleeve2 = coat[1]; pants = '#d8cca4'; pants2 = '#9a8c64'; legOpt = { skin: '#d8cca4', barefoot: true }; }
     if (type === 'knight') { coat = ['#9aa2aa', '#4a5258']; sleeve = coat[0]; sleeve2 = coat[1]; pants = '#7a828a'; pants2 = '#454c52'; legOpt = { skin: L.skin[0], shoe: ['#9aa2aa', '#3a4248'], sole: '#2a2a2a' }; }
     if (isImp) { pants = '#5a4a8a'; pants2 = '#30264a'; legOpt = { skin: L.skin[0], barefoot: true, shorts: true }; bareArms = true; }
-    if (isGarg) { pants = '#4a5a72'; pants2 = '#28324a'; legOpt = { skin: L.skin[0], shoe: ['#3a2a1a', '#140c06'] }; bareArms = true; }
+    if (isGarg) { pants = type === 'archdemon' ? '#2a1410' : '#4a5a72'; pants2 = type === 'archdemon' ? '#120604' : '#28324a'; legOpt = { skin: L.skin[0], shoe: ['#3a2a1a', '#140c06'] }; bareArms = true; }
 
     ctx.save();
     ctx.scale(big * L.scale, big * L.scale);
@@ -441,6 +444,7 @@
 
     ctx.save(); ctx.translate(0, hipY); ctx.rotate(lean);
     const TH = isImp ? 50 : 58, TW = isGarg ? 30 : 23;
+    hook('back', { TH, TW });
     // brazo trasero
     const armPh = moving ? Math.sin(ph + 1.3) * 0.12 : 0;
     let ba = 1.38 + armPh, bb = -0.12;
@@ -476,7 +480,7 @@
       // poste en el brazo trasero
       const ex = 8 - Math.sin(ba) * 34, ey = -TH - 6 + Math.cos(ba) * 34;
       const hx = ex - Math.sin(ba + bb) * 32, hy = ey + Math.cos(ba + bb) * 32;
-      ctx.save(); ctx.translate(hx, hy); ctx.rotate(-(ba + bb) + Math.PI); telephonePole(ctx); ctx.restore();
+      ctx.save(); ctx.translate(hx, hy); ctx.rotate(-(ba + bb) + Math.PI); if (!hook('weapon')) telephonePole(ctx); ctx.restore();
     }
     if (type === 'balloon' && z.armor > 0) {
       const hx = 4 - Math.sin(ba) * 26 - Math.sin(ba + bb) * 25, hy = -TH + 4 + Math.cos(ba) * 26 + Math.cos(ba + bb) * 25;
@@ -512,6 +516,7 @@
       ctx.bezierCurveTo(34, -30, 30, -6, 24, 4); ctx.closePath();
       fs(ctx, rg(ctx, -10, -30, 50, L.skin[0], L.skin[1]), ZO, 3.5);
       // camiseta rota
+      if (type !== 'archdemon') {
       ctx.beginPath(); ctx.moveTo(-28, -10); ctx.lineTo(-30, -TH + 4); ctx.lineTo(-16, -TH - 4); ctx.lineTo(-4, -40); ctx.lineTo(8, -TH - 6); ctx.lineTo(24, -TH + 6);
       ctx.lineTo(28, -12); ctx.lineTo(18, -4); ctx.lineTo(10, -12); ctx.lineTo(0, -2); ctx.lineTo(-10, -12); ctx.lineTo(-18, -4); ctx.closePath();
       fs(ctx, lg(ctx, -30, 0, 28, 0, '#e8e2c8', '#a8a088'), ZO, 2.5);
@@ -519,6 +524,7 @@
       // cinturón
       ctx.fillStyle = C('#3a2414'); ctx.fillRect(-27, -4, 52, 9); ctx.strokeStyle = C(ZO); ctx.lineWidth = 2; ctx.strokeRect(-27, -4, 52, 9);
       rrect(ctx, -6, -5, 12, 11, 2); fs(ctx, '#c8a030', '#3a2a00', 1.5);
+      } else hook('chest', { TH });
     } else {
       // chaqueta con bajo deshilachado
       const c1 = type === 'pole' ? '#f2f2ec' : type === 'football' ? '#c4161c' : coat[0];
@@ -601,8 +607,9 @@
       if (eating) jaw = 0.12 + Math.max(0, Math.sin((z.animT || 0) * 10)) * 0.32;
       if (dying) jaw = 0.35;
       if (state === 'smash') jaw = 0.35;
-      head(ctx, z, L, jaw, { dead: dying && z.dieT > 0.3, noHair: ['football', 'imp', 'knight', 'mummy', 'pharaoh'].includes(type) });
+      head(ctx, z, L, jaw, { dead: dying && z.dieT > 0.3, noHair: ['football', 'imp', 'knight', 'mummy', 'pharaoh', 'vampire', 'witch', 'gargoylez', 'archdemon'].includes(type) });
       headArmor(ctx, type, z.armor > 0 ? z.armor / z.armorMax : 0);
+      hook('head', { jaw });
       ctx.restore();
     }
 
@@ -628,6 +635,7 @@
 
     // pierna delantera
     leg(ctx, -5, hipY, a1L, bL, LEG, legW, pants, legOpt);
+    hook('over', { hipY, ph, moving });
     ctx.restore();
   }
   function smashAngle(z) {
@@ -643,10 +651,12 @@
 
   // Cabeza suelta / brazo suelto (partículas)
   function zombieHead(ctx, z, alive) {
-    const L = z.look || DEFAULT_LOOK;
-    if (z.type === 'gargantuar') ctx.scale(1.3, 1.3);
-    head(ctx, z, L, alive ? 0.15 : 0.3, { dead: !alive, noHair: z.type === 'football' || z.type === 'imp' });
+    const L = z.look || (Art.defaultLook ? Art.defaultLook(z.type) : DEFAULT_LOOK);
+    if (z.type === 'gargantuar' || z.type === 'archdemon') ctx.scale(1.3, 1.3);
+    if (Art.zHook && Art.zHook('fullhead', ctx, z, 0, { alive })) return;
+    head(ctx, z, L, alive ? 0.15 : 0.3, { dead: !alive, noHair: ['football', 'imp', 'knight', 'mummy', 'pharaoh', 'vampire', 'witch', 'gargoylez', 'archdemon'].includes(z.type) });
     headArmor(ctx, z.type, z.armor > 0 ? z.armor / z.armorMax : 0);
+    if (Art.zHook) Art.zHook('head', ctx, z, 0, { jaw: 0.15 });
   }
   function zombieArm(ctx, z) {
     const L = (z && z.look) || DEFAULT_LOOK;
@@ -661,7 +671,7 @@
   }
   // Bloque de hielo para zombis congelados
   function iceBlock(ctx, z, t) {
-    const s = (z.type === 'gargantuar' ? 1.75 : z.type === 'imp' ? 0.66 : 1);
+    const s = (z.type === 'gargantuar' || z.type === 'archdemon' ? 1.75 : z.type === 'imp' ? 0.66 : 1);
     ctx.save(); ctx.scale(s, s);
     rrect(ctx, -40, -170, 78, 172, 12);
     ctx.fillStyle = 'rgba(170,225,255,0.38)'; ctx.fill();
@@ -671,5 +681,5 @@
     ctx.restore();
   }
 
-  Object.assign(Art, { zombie, zombieHead, zombieArm, armorPiece, iceBlock, zombieLook: look, gait, stepPulse });
+  Object.assign(Art, { zombieBase: zombie, headBase: head, zombie, zombieHead, zombieArm, armorPiece, iceBlock, zombieLook: look, gait, stepPulse });
 })();

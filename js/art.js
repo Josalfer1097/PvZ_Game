@@ -22,7 +22,7 @@ const Art = (() => {
   let tint = null, tintA = 0;
   function setTint(col, a) { tint = col; tintA = a || 0; }
   function C(hex) {
-    if (!tintA) return hex;
+    if (!tintA || hex[0] !== '#') return hex;
     const c = rgb(hex);
     return `rgb(${Math.round(c[0] + (tint[0] - c[0]) * tintA)},${Math.round(c[1] + (tint[1] - c[1]) * tintA)},${Math.round(c[2] + (tint[2] - c[2]) * tintA)})`;
   }

@@ -108,6 +108,27 @@ const PLANTS = {
                  desc: 'Rebota a los zombis que lo muerden tres casillas hacia atrás.' },
   moonflower:  { name: 'Girasol lunar', kind: 'sun', cost: 50, cd: 7.5, hp: 300, ready: true, origin: 'new',
                  desc: 'Produce más rápido que el Girasol y, de noche, el doble.' },
+  // --- Reino Gótico (inventadas, con habilidades únicas) ---
+  demon:       { name: 'Demonio', kind: 'shooter', cost: 175, cd: 7.5, hp: 300, ready: true, origin: 'gothic',
+                 desc: 'Lanza fuego infernal que deja el suelo ardiendo bajo los zombis.' },
+  fallenangel: { name: 'Ángel caído', kind: 'shooter', cost: 200, cd: 7.5, hp: 300, ready: true, origin: 'gothic',
+                 desc: 'Dispara plumas negras que atraviesan a TODOS los zombis de la fila.' },
+  demongirl:   { name: 'Demonia', kind: 'charm', cost: 225, cd: 20, hp: 300, ready: true, origin: 'gothic',
+                 desc: 'Lanza besos que hechizan a un zombi: se da la vuelta y lucha a tu favor.' },
+  lilith:      { name: 'Lilith', kind: 'drain', cost: 250, cd: 20, hp: 600, ready: true, origin: 'gothic',
+                 desc: 'Reina de la noche: absorbe la vida de los zombis cercanos y cura a tus plantas.' },
+  ghostlily:   { name: 'Lirio espectral', kind: 'shooter', cost: 150, cd: 7.5, hp: 300, ready: true, origin: 'gothic',
+                 desc: 'Es intangible: los zombis la atraviesan. Sus almas ignoran cascos y escudos.' },
+  reaper:      { name: 'La Parca', kind: 'reaper', cost: 200, cd: 15, hp: 400, ready: true, origin: 'gothic',
+                 desc: 'Siega a los zombis heridos de un tajo y te da sus almas como soles.' },
+  widow:       { name: 'Viuda negra', kind: 'web', cost: 100, cd: 7.5, hp: 300, ready: true, origin: 'gothic',
+                 desc: 'Teje telarañas que atrapan y frenan a los zombis de su fila.' },
+  cursedpumpkin:{ name: 'Calabaza maldita', kind: 'wall', cost: 125, cd: 30, hp: 2500, ready: true, origin: 'gothic',
+                 desc: 'Muro maldito: cuando lo destruyen, explota y arrasa todo a su alrededor.' },
+  bloodrose:   { name: 'Rosa de sangre', kind: 'sun', cost: 50, cd: 7.5, hp: 300, ready: true, origin: 'gothic',
+                 desc: 'Da soles y, además, recoge el alma de cada zombi que muere cerca.' },
+  gargoyle:    { name: 'Gárgola', kind: 'wall', cost: 125, cd: 30, hp: 6000, ready: true, origin: 'gothic',
+                 desc: 'Estatua de piedra durísima. Puede petrificar a quien la muerde.' },
 };
 // Objetos especiales del minijuego de bolos
 const BOWL = {
@@ -118,6 +139,7 @@ const BOWL = {
 const PLANT_ORDER = Object.keys(PLANTS);
 const DEFAULT_PICK = ['sunflower', 'peashooter', 'wallnut', 'cherrybomb', 'snowpea', 'repeater',
   'kernelpult', 'bonkchoy', 'torchwood', 'potatomine'];
+const GOTHIC_PICK = ['bloodrose', 'demon', 'fallenangel', 'reaper', 'lilith', 'demongirl', 'ghostlily', 'widow', 'cursedpumpkin', 'gargoyle'];
 
 // ====== Zombis ======
 // hp: vida del cuerpo, armor: vida del accesorio, speed: multiplicador, cost: puntos de oleada
@@ -152,6 +174,18 @@ const ZOMBIES = {
                 desc: 'Zombi del antiguo Egipto envuelto en vendas.' },
   pharaoh:    { name: 'Faraón zombi', hp: 270, armor: 1200, speed: 0.75, cost: 5, shield: true,
                 desc: 'Arrastra un sarcófago que le protege por delante.' },
+  vampire:    { name: 'Vampiro', hp: 500, armor: 0, speed: 1.2, cost: 3,
+                desc: 'Se cura al morder. Elimínalo rápido.' },
+  witch:      { name: 'Bruja', hp: 400, armor: 0, speed: 0.9, cost: 3,
+                desc: 'Hechiza a las plantas de delante y las deja paralizadas un rato.' },
+  skeleton:   { name: 'Esqueleto', hp: 220, armor: 0, speed: 1.5, cost: 2,
+                desc: 'Se recompone una vez tras caer, salvo que lo quemes o lo aplastes.' },
+  ghost:      { name: 'Fantasma', hp: 350, armor: 0, speed: 1, cost: 3,
+                desc: 'A ratos se vuelve intangible y los disparos rectos lo atraviesan.' },
+  gargoylez:  { name: 'Gárgola zombi', hp: 270, armor: 1000, speed: 0.85, cost: 4,
+                desc: 'Lleva alas de piedra que la protegen.' },
+  archdemon:  { name: 'Archidemonio', hp: 5000, armor: 0, speed: 0.6, cost: 14,
+                desc: 'Jefe infernal: incendia plantas con su tridente e invoca esqueletos.' },
 };
 const ZOMBIE_ORDER = Object.keys(ZOMBIES);
 const ZOMBIE_BASE_SPEED = 23;   // px/s (≈ 5 s por casilla)
@@ -163,6 +197,7 @@ const STAGES = {
   dusk:  { name: 'Atardecer', skySun: [9.5, 12], music: 'day', tint: 'rgb(255,200,165)', startSun: 100 },
   night: { name: 'Noche', skySun: [11, 14], music: 'night', tint: 'rgb(120,140,215)', startSun: 150 },
   fog:   { name: 'Niebla', skySun: [11, 14], music: 'night', tint: 'rgb(130,150,205)', startSun: 150, fog: 4 },
+  gothic: { name: 'Reino Gótico', skySun: [9, 11.5], music: 'gothic', tint: 'rgb(205,170,225)', startSun: 150 },
   egypt: { name: 'Antiguo Egipto', skySun: [8, 10.5], music: 'egypt', tint: 'rgb(255,240,215)', startSun: 75 },
 };
 
@@ -223,6 +258,18 @@ const WORLDS = [
     lv('egypt', 25, [...ZE, 'pharaoh', 'imp', 'gargantuar'], 0.45, '¡Gargantúas en el desierto!', { tombs: 7 }),
     lv('egypt', 35, ['mummy', 'cone', 'pole', 'bucket', 'pharaoh', 'knight', 'football', 'imp', 'gargantuar'], 0.5, '¡La gran pirámide! Nivel final.', { tombs: 8 }),
   ] },
+  { id: 'gothic', name: 'Reino Gótico', levels: [
+    lv('gothic', 10, ['normal', 'skeleton', 'cone'], 0.26, 'Bienvenida al Reino Gótico. Los esqueletos se recomponen una vez.', { tombs: 3 }),
+    lv('gothic', 15, ['normal', 'skeleton', 'vampire'], 0.3, 'El vampiro se cura al morder: no le dejes llegar.', { tombs: 3 }),
+    lv('gothic', 15, ['skeleton', 'cone', 'witch'], 0.32, 'La bruja paraliza tus plantas. ¡La Parca siega a los heridos!', { tombs: 4 }),
+    lv('gothic', 20, ['normal', 'skeleton', 'ghost', 'vampire'], 0.34, 'Los fantasmas esquivan los disparos rectos. El Lirio espectral los alcanza.', { tombs: 4 }),
+    lv('gothic', 20, ['skeleton', 'gargoylez', 'witch', 'cone'], 0.36, 'La Demonia hechiza zombis para que luchen por ti.', { tombs: 5 }),
+    lv('gothic', 20, ['vampire', 'ghost', 'bucket', 'skeleton'], 0.36, 'Lilith absorbe vida y cura a tus plantas.', { tombs: 5 }),
+    lv('gothic', 25, ['skeleton', 'witch', 'gargoylez', 'vampire', 'imp'], 0.38, 'La Calabaza maldita explota al caer.', { tombs: 5 }),
+    lv('gothic', 25, ['skeleton', 'ghost', 'vampire', 'archdemon'], 0.34, '¡Un Archidemonio! Fuego, almas y mucha paciencia.', { tombs: 6 }),
+    lv('gothic', 30, ['skeleton', 'witch', 'ghost', 'gargoylez', 'vampire', 'knight'], 0.4, 'Las sombras se espesan...', { tombs: 6 }),
+    lv('gothic', 40, ['skeleton', 'witch', 'ghost', 'gargoylez', 'vampire', 'archdemon', 'gargantuar'], 0.42, '¡Noche final en el Reino Gótico!', { tombs: 7 }),
+  ] },
 ];
 const LEVELS = [];
 WORLDS.forEach(w => w.levels.forEach((l, i) => { l.world = w.id; l.num = i + 1; LEVELS.push(l); }));
@@ -246,6 +293,9 @@ const MINIGAMES = {
   giants: { name: 'Ataque de gigantes', desc: 'Solo Gargantúas y diablillos. Empiezas con 1500 soles.',
     stage: 'egypt', waves: 10, zombies: ['gargantuar', 'imp'], growth: 1.4, mode: 'giants', startSun: 1500,
     tip: 'Explosivos, hielo y mucho daño. ¡Suerte!' },
+  vampires: { name: 'Noche de vampiros', desc: 'Solo vampiros y murciélagos... digo, esqueletos.',
+    stage: 'gothic', waves: 15, zombies: ['vampire', 'skeleton'], growth: 0.5, mode: 'normal', startSun: 300,
+    tip: 'Las plantas góticas son tus mejores aliadas aquí.' },
   rush: { name: 'Carrera zombi', desc: 'Los zombis van al doble de velocidad.',
     stage: 'day', waves: 15, zombies: ['normal', 'cone', 'pole', 'bucket', 'paper', 'football'], growth: 0.36, mode: 'rush', startSun: 450,
     tip: '¡Rápido! Todo va al doble de velocidad.' },
@@ -254,7 +304,7 @@ const MINIGAMES = {
 // ====== Guardado ======
 const Save = {
   key: 'jardin_vs_zombis_save_v3',
-  data: { done: [], best: 0, sound: true, music: true, autoSun: false, hpBars: false, pick: null, world: 'day' },
+  data: { done: [], best: 0, sound: true, music: true, autoSun: false, hpBars: false, pick: null, world: 'day', quality: 'auto' },
   load() {
     try {
       const d = JSON.parse(localStorage.getItem(this.key));

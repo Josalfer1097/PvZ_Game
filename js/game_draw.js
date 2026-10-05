@@ -40,7 +40,8 @@ Object.assign(Game.prototype, {
     for (let r = 0; r < ROWS; r++) {
       const m = this.mowers[r];
       if (m && m.state !== 'gone') Art.mower(ctx, m.x, rowGroundY(r) + 4, t, m.state === 'run');
-      for (const tb of this.tombs) if (tb.r === r) Art.tomb(ctx, cellCX(tb.c), rowGroundY(r), tb.hp / tb.max);
+      for (const f of this.patches) if (f.row === r) { ctx.save(); ctx.globalAlpha = Math.min(1, f.t); Art.ell(ctx, f.x, rowGroundY(r) + 2, 50, 12); ctx.fillStyle = 'rgba(40,10,0,0.55)'; ctx.fill(); ctx.restore(); }
+      for (const tb of this.tombs) if (tb.r === r) Art.tomb(ctx, cellCX(tb.c), rowGroundY(r), tb.hp / tb.max, this.stage === 'gothic' ? 'gothic' : null);
       for (const p of this.plants) if (p.row === r && p.kind === 'spike') this.drawPlant(ctx, p, t);
       for (const p of this.plants) if (p.row === r && p.kind !== 'spike') this.drawPlant(ctx, p, t);
       for (const rl of this.rollers) if (Math.round((rl.y - rowGroundY(0)) / ROW_H) === r) {
@@ -49,7 +50,15 @@ Object.assign(Game.prototype, {
       const zs = this.zombies.filter(z => z.row === r && z.state !== 'thrown').sort((a, b) => b.x - a.x);
       for (const z of zs) this.drawZombie(ctx, z, t);
       for (const pe of this.peas) if (pe.row === r) {
-        if (pe.kind === 'thorn') Art.projectile(ctx, 'thorn', pe.x, pe.y, 0, t);
+        // estela
+        ctx.save();
+        pe.trail.forEach(([tx, ty], i) => {
+          ctx.globalAlpha = 0.22 * (1 - i / pe.trail.length);
+          const col = { snow: '#bfefff', fire: '#ffb040', hellfire: '#ff5a20', feather: '#8a6ac8', wisp: '#a8f4ff' }[pe.kind] || '#b8f070';
+          Art.circle(ctx, tx - 6, ty, 9 - i); ctx.fillStyle = col; ctx.fill();
+        });
+        ctx.restore();
+        if (pe.kind === 'thorn' || pe.kind === 'hellfire' || pe.kind === 'feather' || pe.kind === 'wisp') Art.projectile(ctx, pe.kind, pe.x, pe.y, 0, t);
         else Art.pea(ctx, pe.x, pe.y, pe.kind, t);
       }
     }
@@ -93,7 +102,10 @@ Object.assign(Game.prototype, {
     for (const s of this.suns) {
       let a = 1;
       if (s.state === 'ground' && s.life > 8) a = Math.sin(s.life * 18) > 0 ? 1 : 0.4;
-      ctx.save(); ctx.globalAlpha = a; Art.sun(ctx, s.x, s.y, t + s.t, s.scale || 1); ctx.restore();
+      ctx.save(); ctx.globalAlpha = a;
+      if (s.bounce > 0) { const k = Math.sin((0.35 - s.bounce) / 0.35 * Math.PI) * 0.18; ctx.translate(s.x, s.y + 20); ctx.scale(1 + k, 1 - k); ctx.translate(-s.x, -s.y - 20); }
+      if (s.soul) Art.soul(ctx, s.x, s.y, t + s.t, s.scale || 1); else Art.sun(ctx, s.x, s.y, t + s.t, s.scale || 1);
+      ctx.restore();
     }
     ctx.restore();
 
@@ -137,8 +149,11 @@ Object.assign(Game.prototype, {
     if (p.kind !== 'spike') Art.shadow(ctx, 0, (p.lift || 0) + 2, 38 - (p.lift || 0) * 0.1, 10);
     const grow = Math.min(1, p.plantT / 0.18);
     const sq = 1 + Math.sin(Math.min(1, p.plantT / 0.3) * Math.PI) * 0.12;
-    ctx.scale(grow * sq, grow * (2 - sq));
+    const br = p.kind === 'spike' ? 0 : Math.sin(t * 2.2 + p.seed * 3) * 0.018;
+    if (p.flash > 0) ctx.translate(rand(-1.5, 1.5), 0);
+    ctx.scale(grow * sq * (1 - br * 0.6), grow * (2 - sq) * (1 + br));
     if (p.flash > 0) Art.setTint([255, 255, 255], 0.25);
+    else if (p.hexed > 0) Art.setTint([150, 60, 200], 0.45);
     const nut = p.kind === 'wall' || p.type === 'garlic';
     const s = {
       seed: p.seed, recoil: p.recoil, glow: p.glow, fuse: p.fuse, armed: p.armed, pop: p.pop, mode: p.mode,
@@ -153,6 +168,11 @@ Object.assign(Game.prototype, {
       ctx.save(); ctx.translate(0, -88); ctx.scale(0.55, 0.55); ctx.rotate(0.2); Art.armorPiece(ctx, p.holding); ctx.restore();
     }
     Art.setTint(null, 0);
+    if (p.hexed > 0) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(150,255,100,0.7)'; ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(0, -60, 30 + i * 8, t * 3 + i * 2, t * 3 + i * 2 + 2); ctx.stroke(); }
+      ctx.restore();
+    }
     ctx.restore();
   },
 
@@ -160,7 +180,7 @@ Object.assign(Game.prototype, {
     ctx.save();
     const x = z.x;
     let y = z.y;
-    const big = z.type === 'gargantuar' ? 1.7 : z.type === 'imp' ? 0.7 : 1;
+    const big = this.isGiant(z) ? 1.7 : z.type === 'imp' ? 0.7 : 1;
     const flying = this.isFlying(z) || z.state === 'blown';
     let lift = 0;
     if (flying) lift = 70 + Math.sin(t * 2 + x * 0.01) * 6;
@@ -174,6 +194,11 @@ Object.assign(Game.prototype, {
     } else if (z.state === 'thrown') {
       Art.shadow(ctx, x, y, 20, 6);
       ctx.translate(x, y - (z.lift || 0)); ctx.rotate(-z.flyT * Math.PI * 2);
+    } else if (z.state === 'rise') {
+      const k = clamp(z.riseT, 0, 1);
+      Art.shadow(ctx, x, y, 34 * k, 9 * k);
+      ctx.beginPath(); ctx.rect(x - 120, y - 400, 240, 404); ctx.clip();
+      ctx.translate(x, y + (1 - k) * 175); ctx.rotate((1 - k) * 0.3 * Math.sin(t * 20));
     } else {
       if (z.state !== 'dying' || z.dieT < 1.5) Art.shadow(ctx, x, y, (34 - lift * 0.15) * big, (9 - lift * 0.04) * big);
       ctx.translate(x, y - lift);
@@ -195,6 +220,8 @@ Object.assign(Game.prototype, {
         alpha = clamp((2.6 - z.dieT) / 0.6, 0, 1);
       }
     } else if (z.flash > 0) Art.setTint([255, 255, 255], 0.45);
+    else if (z.stone > 0) Art.setTint([150, 148, 140], 0.75);
+    else if (z.charmed) Art.setTint([255, 120, 200], 0.3);
     else if (z.frozen > 0) Art.setTint([150, 210, 255], 0.55);
     else if (z.slow > 0) Art.setTint([80, 150, 255], 0.42);
     else if (z.enraged) Art.setTint([255, 60, 30], 0.12);
@@ -205,7 +232,13 @@ Object.assign(Game.prototype, {
     else if (flying) zz = Object.assign({}, z, { state: 'fly' });
     Art.zombie(ctx, zz, t);
     Art.setTint(null, 0);
-    if (z.frozen > 0) Art.iceBlock(ctx, z, t);
+    if (z.frozen > 0 && !z.stone) Art.iceBlock(ctx, z, t);
+    if (z.webT > 0) {
+      ctx.save(); ctx.globalAlpha *= Math.min(1, z.webT) * 0.7; ctx.strokeStyle = '#f0f0f8'; ctx.lineWidth = 1.3;
+      for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; ctx.beginPath(); ctx.moveTo(-6, -70); ctx.lineTo(-6 + Math.cos(a) * 50, -70 + Math.sin(a) * 60); ctx.stroke(); }
+      for (const rr of [18, 34]) { ctx.beginPath(); ctx.ellipse(-6, -70, rr, rr * 1.2, 0, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.restore();
+    }
     if (z.butterT > 0 && !z.headless) Art.projectile(ctx, 'butter', -14 * big, -150 * big, 0.1, t, big);
     ctx.restore();
     if (Save.data.hpBars && this.alive(z) && z.x < ZOMBIE_VISIBLE_X && this.mode !== 'invisible') {
@@ -218,7 +251,7 @@ Object.assign(Game.prototype, {
   },
 
   drawParts(ctx, glow) {
-    const GLOW = { fire: 1, flash: 1, text: 1, sparkle: 1, snowflake: 1, beam: 1, bolt: 1 };
+    const GLOW = { ring: 1, fire: 1, flash: 1, text: 1, sparkle: 1, snowflake: 1, beam: 1, bolt: 1, drain: 1, slash: 1, spark: 1, heartp: 1 };
     for (const p of this.parts) {
       if (p.delay > 0 || !!GLOW[p.kind] !== glow) continue;
       const k = p.t / p.life;
@@ -288,6 +321,28 @@ Object.assign(Game.prototype, {
           ctx.translate(p.x + (p.tx - p.x) * e, p.y + (p.ty - p.y) * e - Math.sin(k * Math.PI) * 40); ctx.scale(1 - k * 0.45, 1 - k * 0.45);
           Art.armorPiece(ctx, p.type); break;
         }
+        case 'plantdie': {
+          ctx.globalAlpha = 1 - k; ctx.translate(p.x, p.y); ctx.rotate(k * 0.6); ctx.scale(1 - k * 0.6, 1 - k * 0.9);
+          Art.plant(ctx, p.type, p.seed, { armed: true }); break;
+        }
+        case 'drain': {
+          const e = k;
+          ctx.globalCompositeOperation = 'lighter';
+          const x = p.x + (p.tx - p.x) * e, y = p.y + (p.ty - p.y) * e - Math.sin(e * Math.PI) * 40;
+          Art.glow(ctx, x, y, 14, '255,40,70', 0.9 * (1 - e * 0.5)); break;
+        }
+        case 'slash': {
+          ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1 - k;
+          ctx.strokeStyle = '#e8d8ff'; ctx.lineWidth = 10 * (1 - k); ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.arc(p.x, p.y, 110, -1.5 + k * 0.6, 0.9 + k * 0.6); ctx.stroke();
+          ctx.strokeStyle = 'rgba(180,120,255,0.6)'; ctx.lineWidth = 24 * (1 - k); ctx.stroke(); break;
+        }
+        case 'ring': {
+          ctx.globalAlpha = (1 - k) * 0.8; ctx.strokeStyle = '#fff2c0'; ctx.lineWidth = 10 * (1 - k);
+          Art.ell(ctx, p.x, p.y, p.size * (0.2 + k), p.size * (0.2 + k) * 0.4); ctx.stroke(); break;
+        }
+        case 'spark': ctx.globalCompositeOperation = 'lighter'; Art.glow(ctx, p.x, p.y, p.size * 2, p.color, 1 - k); break;
+        case 'heartp': ctx.globalAlpha = 1 - k; Art.heart(ctx, p.x, p.y, p.size, '#ff4a9a'); break;
         case 'pole':
           ctx.globalAlpha = clamp((p.life - p.t) / 0.4, 0, 1);
           ctx.translate(p.x, p.y); ctx.rotate(p.rot); Art.line(ctx, [-80, 0, 80, 0], 5, '#d8b060', '#4a3510', 2); break;
@@ -379,7 +434,7 @@ Object.assign(Game.prototype, {
       const pk = this.packets[i];
       if (!pk) { Art.rrect(ctx, r.x, r.y, r.w, r.h, 8); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill(); continue; }
       const cost = PLANTS[pk.type].cost;
-      UI.packet(ctx, r.x, r.y, pk.type, t, { cd: pk.cd / pk.cdMax, poor: this.sun < cost, selected: this.selected === i, key: (i + 1) % 10, premium: PLANTS[pk.type].premium });
+      UI.packet(ctx, r.x, r.y, pk.type, t, { cd: pk.cd / pk.cdMax, poor: this.sun < cost, selected: this.selected === i, key: (i + 1) % 10, premium: PLANTS[pk.type].premium, ready: pk.ready, hover: UI.isOver(r.x, r.y, r.w, r.h) && pk.cd <= 0 && this.sun >= cost });
       UI.region(r.x, r.y, r.w, r.h, () => this.selectPacket(i));
       if (UI.isOver(r.x, r.y, r.w, r.h)) hover = { type: pk.type, x: r.x };
     }
@@ -471,8 +526,8 @@ Object.assign(Game.prototype, {
     UI.panel(ctx, px, py, pw, ph);
     UI.text(ctx, 'Elige tus plantas', px + pw / 2, py + 40, 44, { fill: '#ffe48a', stroke: '#3a1e05', lw: 8 });
     UI.text(ctx, `Lleva hasta ${this.slots} · ${PLANT_ORDER.length} plantas, todas desbloqueadas y gratis`, px + pw / 2, py + 80, 21, { fill: '#f7e9c2', stroke: null, font: UI.BODY, weight: 'bold' });
-    const cols = 11, S = 0.76, cw = 84 * S, chh = 116 * S;
-    const pos = i => ({ x: px + 38 + (i % cols) * (cw + 15), y: py + 104 + Math.floor(i / cols) * (chh + 12) });
+    const cols = 13, S = 0.64, cw = 84 * S, chh = 116 * S;
+    const pos = i => ({ x: px + 40 + (i % cols) * (cw + 15), y: py + 102 + Math.floor(i / cols) * (chh + 10) });
     let hovered = null;
     this.owned.forEach((type, i) => {
       const { x, y } = pos(i);
@@ -488,7 +543,7 @@ Object.assign(Game.prototype, {
     const ty = py + 540;
     if (hovered) {
       const d = PLANTS[hovered];
-      const tag = d.origin === 'new' ? ' · ¡NUEVA!' : d.origin === 2 ? ' · Secuela' : '';
+      const tag = d.origin === 'gothic' ? ' · Gótica' : d.origin === 'new' ? ' · ¡NUEVA!' : d.origin === 2 ? ' · Secuela' : '';
       UI.text(ctx, `${d.name} · ${d.cost} soles · recarga ${d.cd}s${tag}`, px + pw / 2, ty, 28, { fill: '#ffe48a', stroke: '#3a1e05', lw: 6 });
       UI.text(ctx, d.desc, px + pw / 2, ty + 38, 21, { fill: '#f7e9c2', stroke: null, font: UI.BODY, weight: 'bold' });
     } else {
@@ -545,7 +600,8 @@ Object.assign(Game.prototype, {
     y += 68;
     half(`Auto-soles: ${d.autoSun ? 'Sí' : 'No'}`, () => { d.autoSun = !d.autoSun; Save.save(); Sfx.play('click'); }, px + 70);
     half(`Barras de vida: ${d.hpBars ? 'Sí' : 'No'}`, () => { d.hpBars = !d.hpBars; Save.save(); Sfx.play('click'); }, px + 90 + (pw - 160) / 2);
-    y += 80;
+    y += 72;
+    b(`Calidad gráfica: ${this.app.qualityLabel()}`, () => { Sfx.play('click'); this.app.cycleQuality(); }, { color: 'stone', size: 22 });
     b(this.confirmQuit ? '¿Seguro? Pulsa otra vez' : 'Menú principal', () => {
       Sfx.play('click');
       if (this.confirmQuit) this.app.go('menu'); else this.confirmQuit = true;

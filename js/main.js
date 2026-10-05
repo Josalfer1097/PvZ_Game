@@ -40,16 +40,17 @@ const App = {
       if (document.hidden && this.game && this.game.phase === 'play') this.game.paused = true;
     });
     // zombis que desfilan por el menú
-    this.menuZombies = ['cone', 'knight', 'bucket', 'gargantuar', 'mummy', 'imp', 'pharaoh', 'football'].map((type, i) => ({
+    this.menuZombies = ['vampire', 'knight', 'skeleton', 'archdemon', 'witch', 'imp', 'pharaoh', 'ghost'].map((type, i) => ({
       type, look: Art.zombieLook(type), animT: i * 1.7, state: 'walk', armor: 1, armorMax: 1, hasPole: true, hasImp: true, impLook: Art.zombieLook('imp'),
-      x: 1100 + i * 260, y: 800 + (i % 2) * 40, spd: 26 * ZOMBIES[type].speed,
+      x: 1100 + i * 260, y: 800 + (i % 2) * 40, spd: 26 * Math.min(1.3, ZOMBIES[type].speed),
     }));
     requestAnimationFrame(ts => this.loop(ts));
   },
 
   resize() {
     const cw = window.innerWidth, ch = window.innerHeight;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 3) * this.renderScale;
+    const q = Save.data.quality || 'auto', base = window.devicePixelRatio || 1;
+    this.dpr = q === 'ultra' ? Math.min(base * 1.5, 4) : q === 'alta' ? Math.min(base, 3) : q === 'media' ? Math.min(base, 3) * 0.7 : Math.min(base, 3) * this.renderScale;
     this.canvas.width = Math.round(cw * this.dpr);
     this.canvas.height = Math.round(ch * this.dpr);
     this.canvas.style.width = cw + 'px';
@@ -97,7 +98,7 @@ const App = {
   // Resolución adaptativa: si el equipo no llega a ~40 fps, baja un poco la
   // resolución interna; si va sobrado, la vuelve a subir hasta el máximo (HD).
   adaptQuality(dt) {
-    if (document.hidden || dt <= 0) return;
+    if (document.hidden || dt <= 0 || (Save.data.quality && Save.data.quality !== 'auto')) return;
     const P = this.perf;
     P.acc += dt; P.n++;
     if (P.acc < 1) return;
@@ -121,16 +122,28 @@ const App = {
     else if (this.screen === 'almanac') this.drawAlmanac(ctx);
     else if (this.screen === 'minigames') this.drawMinigames(ctx);
     else if (this.screen === 'game' && this.game) this.game.draw(ctx);
+    if (this.fade > 0) {
+      this.fade = Math.max(0, this.fade - 1 / 20);
+      ctx.fillStyle = `rgba(5,2,8,${this.fade})`; ctx.fillRect(0, 0, W, H);
+    }
     ctx.restore();
     this.canvas.style.cursor = UI.find(this.mouse.x, this.mouse.y) ? 'pointer' : 'default';
   },
 
+  cycleQuality() {
+    const order = ['auto', 'ultra', 'alta', 'media'];
+    Save.data.quality = order[(order.indexOf(Save.data.quality || 'auto') + 1) % order.length]; Save.save();
+    this.renderScale = 1; this.resize(); UI.packetCache = {};
+  },
+  qualityLabel() { return { auto: 'Automática', ultra: 'Ultra (4K)', alta: 'Alta', media: 'Media' }[Save.data.quality || 'auto']; },
   go(screen) {
+    this.fade = 1;
     this.screen = screen;
     this.confirmReset = false;
     if (screen !== 'game') { this.game = null; Sfx.setTrack('menu'); }
   },
   startLevel(idx) {
+    this.fade = 1;
     this.game = new Game(this, idx);
     this.screen = 'game';
   },
@@ -197,6 +210,7 @@ const App = {
     y += 76;
     UI.button(ctx, bx, y, bw / 2 - 8, 54, `Sonido: ${d.sound ? 'Sí' : 'No'}`, () => { Sfx.setSound(!d.sound); Sfx.play('click'); }, { size: 22, color: 'stone' });
     UI.button(ctx, bx + bw / 2 + 8, y, bw / 2 - 8, 54, `Música: ${d.music ? 'Sí' : 'No'}`, () => { Sfx.init(); Sfx.setMusic(!d.music); Sfx.play('click'); }, { size: 22, color: 'stone' });
+    UI.button(ctx, W - 290, 20, 270, 50, `Calidad: ${this.qualityLabel()}`, () => { Sfx.play('click'); this.cycleQuality(); }, { size: 20, color: 'stone' });
     UI.text(ctx, 'Teclas: 1-9 y 0 elegir planta · S pala · Esc pausa · Clic derecho cancelar', W / 2, 884, 18, { fill: '#e8dfc0', stroke: '#1a1005', lw: 4, font: UI.BODY, weight: 'bold' });
   },
 
@@ -209,14 +223,14 @@ const App = {
     UI.panel(ctx, px, py, pw, ph);
     UI.text(ctx, 'Mundos', W / 2, py + 48, 50, { fill: '#ffe48a', stroke: '#3a1e05', lw: 9 });
     // pestañas de mundos
-    const tabW = 240;
+    const tabW = 200;
     WORLDS.forEach((w, i) => {
       const x = px + 40 + i * (tabW + 16), y = py + 90;
       const doneN = w.levels.filter(l => d.done.includes(LEVELS.indexOf(l))).length;
-      UI.button(ctx, x, y, tabW, 58, `${w.name} ${doneN}/${w.levels.length}`, () => { d.world = w.id; Save.save(); Sfx.play('click'); },
+      UI.button(ctx, x, y, tabW, 58, `${w.name.replace('Jardín de día', 'Día')} ${doneN}/${w.levels.length}`, () => { d.world = w.id; Save.save(); Sfx.play('click'); },
         { size: 19, color: w.id === world.id ? 'green' : 'stone' });
     });
-    const stageCol = { day: ['#5f9a34', '#3f7a22'], dusk: ['#c0703a', '#8a4a24'], night: ['#3a4a8a', '#24305a'], fog: ['#5a6a8a', '#343e5a'], egypt: ['#d8a058', '#9a6a2a'] };
+    const stageCol = { day: ['#5f9a34', '#3f7a22'], dusk: ['#c0703a', '#8a4a24'], night: ['#3a4a8a', '#24305a'], fog: ['#5a6a8a', '#343e5a'], egypt: ['#d8a058', '#9a6a2a'], gothic: ['#5a1a3a', '#1a0612'] };
     const cw = 236, chh = 230, gap = 14;
     world.levels.forEach((L, i) => {
       const idx = LEVELS.indexOf(L);
@@ -258,10 +272,10 @@ const App = {
     UI.panel(ctx, px, py, pw, ph);
     UI.text(ctx, 'Minijuegos', W / 2, py + 50, 52, { fill: '#ffe48a', stroke: '#3a1e05', lw: 9 });
     const keys = Object.keys(MINIGAMES);
-    const cw = 400, chh = 310;
+    const cw = 400, chh = 205;
     keys.forEach((k, i) => {
       const M = MINIGAMES[k];
-      const cx = px + 50 + (i % 3) * (cw + 30), cy = py + 100 + Math.floor(i / 3) * (chh + 24);
+      const cx = px + 50 + (i % 3) * (cw + 30), cy = py + 96 + Math.floor(i / 3) * (chh + 18);
       const over = UI.isOver(cx, cy, cw, chh);
       ctx.save();
       if (over) { ctx.translate(cx + cw / 2, cy + chh / 2); ctx.scale(1.03, 1.03); ctx.translate(-(cx + cw / 2), -(cy + chh / 2)); }
@@ -271,21 +285,22 @@ const App = {
       ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(cx, cy, cw, chh);
       // vista previa
       ctx.translate(cx, cy);
-      if (k === 'bowling') { for (let j = 0; j < 3; j++) { ctx.save(); ctx.translate(80 + j * 90, 190 - j * 10); Art.bowlnut(ctx, ['nut', 'boomnut', 'bignut'][j], t * 3 + j, t); ctx.restore(); } }
-      else if (k === 'conveyor') { Art.conveyor(ctx, 20, 110, 360, 100, t); for (let j = 0; j < 3; j++) { ctx.save(); ctx.translate(70 + j * 120, 195); ctx.scale(0.75, 0.75); Art.plant(ctx, ['peashooter', 'cherrybomb', 'bonkchoy'][j], t + j, { armed: true }); ctx.restore(); } }
+      if (k === 'bowling') { for (let j = 0; j < 3; j++) { ctx.save(); ctx.translate(80 + j * 90, 120 - j * 6); ctx.scale(0.7, 0.7); Art.bowlnut(ctx, ['nut', 'boomnut', 'bignut'][j], t * 3 + j, t); ctx.restore(); } }
+      else if (k === 'conveyor') { Art.conveyor(ctx, 20, 20, 360, 90, t); for (let j = 0; j < 3; j++) { ctx.save(); ctx.translate(70 + j * 120, 100); ctx.scale(0.62, 0.62); Art.plant(ctx, ['peashooter', 'cherrybomb', 'bonkchoy'][j], t + j, { armed: true }); ctx.restore(); } }
       else {
-        const zt = { laststand: 'bucket', invisible: 'normal', giants: 'gargantuar', rush: 'football' }[k];
-        ctx.save(); ctx.translate(250, 245); const s = zt === 'gargantuar' ? 0.65 : 1.05; ctx.scale(s, s);
+        const zt = { laststand: 'bucket', invisible: 'normal', giants: 'gargantuar', rush: 'football', vampires: 'vampire' }[k];
+        ctx.save(); ctx.translate(250, 150); const s = zt === 'gargantuar' ? 0.45 : 0.75; ctx.scale(s, s);
         if (k === 'invisible') ctx.globalAlpha = 0.25 + 0.2 * Math.sin(t * 2);
         Art.zombie(ctx, { type: zt, look: null, animT: t, state: 'walk', armor: 1, armorMax: 1, hasImp: true }, t);
         ctx.restore();
-        if (k === 'laststand') { ctx.save(); ctx.translate(90, 240); Art.plant(ctx, 'gatling', t, {}); ctx.restore(); }
+        if (k === 'laststand') { ctx.save(); ctx.translate(90, 150); ctx.scale(0.8, 0.8); Art.plant(ctx, 'gatling', t, {}); ctx.restore(); }
+        if (k === 'vampires') { ctx.save(); ctx.translate(90, 150); ctx.scale(0.8, 0.8); Art.plant(ctx, 'reaper', t, {}); ctx.restore(); }
       }
       ctx.restore();
       ctx.lineWidth = 4; ctx.strokeStyle = over ? '#ffe48a' : '#1e1408'; Art.rrect(ctx, cx, cy, cw, chh, 20); ctx.stroke();
-      Art.rrect(ctx, cx, cy + chh - 92, cw, 92, 0); ctx.fillStyle = 'rgba(20,12,4,0.78)'; ctx.fill();
-      UI.text(ctx, M.name, cx + cw / 2, cy + chh - 64, 30, { fill: '#ffe48a', stroke: '#1e1408', lw: 6 });
-      UI.text(ctx, M.desc, cx + cw / 2, cy + chh - 28, 16, { fill: '#f4ecd0', stroke: null, font: UI.BODY, weight: 'bold' });
+      Art.rrect(ctx, cx, cy + chh - 70, cw, 70, 0); ctx.fillStyle = 'rgba(20,12,4,0.8)'; ctx.fill();
+      UI.text(ctx, M.name, cx + cw / 2, cy + chh - 48, 26, { fill: '#ffe48a', stroke: '#1e1408', lw: 6 });
+      UI.text(ctx, M.desc, cx + cw / 2, cy + chh - 18, 15, { fill: '#f4ecd0', stroke: null, font: UI.BODY, weight: 'bold' });
       if (d.done.includes('mg:' + k)) UI.text(ctx, '★', cx + 34, cy + 36, 40, { fill: '#ffd23a', stroke: '#4a2a00', lw: 5, font: UI.BODY });
       ctx.restore();
       UI.region(cx, cy, cw, chh, () => { Sfx.play('click'); this.startLevel('mg:' + k); });
@@ -303,24 +318,24 @@ const App = {
     UI.button(ctx, px + 40, py + 82, 280, 50, `Plantas (${PLANT_ORDER.length})`, () => { A.tab = 'plants'; A.sel = 'peashooter'; Sfx.play('click'); }, { size: 22, color: A.tab === 'plants' ? 'green' : 'stone' });
     UI.button(ctx, px + 340, py + 82, 280, 50, `Zombis (${ZOMBIE_ORDER.length})`, () => { A.tab = 'zombies'; A.sel = 'normal'; A.z = null; Sfx.play('click'); }, { size: 22, color: A.tab === 'zombies' ? 'red' : 'stone' });
     if (A.tab === 'plants') {
-      const S = 0.74;
+      const S = 0.6;
       PLANT_ORDER.forEach((type, i) => {
-        const x = px + 36 + (i % 7) * 84, y = py + 150 + Math.floor(i / 7) * 100;
+        const x = px + 36 + (i % 9) * 66, y = py + 150 + Math.floor(i / 9) * 80;
         ctx.save(); ctx.translate(x, y); ctx.scale(S, S); UI.packet(ctx, 0, 0, type, t, { premium: PLANTS[type].premium }); ctx.restore();
         if (A.sel === type) { Art.rrect(ctx, x - 3, y - 3, 84 * S + 6, 116 * S + 6, 9); ctx.lineWidth = 4; ctx.strokeStyle = '#ffe48a'; ctx.stroke(); }
         UI.region(x, y, 84 * S, 116 * S, () => { A.sel = type; Sfx.play('select'); });
       });
     } else {
       ZOMBIE_ORDER.forEach((type, i) => {
-        const x = px + 36 + (i % 4) * 146, y = py + 150 + Math.floor(i / 4) * 150;
-        Art.rrect(ctx, x, y, 134, 138, 14); ctx.fillStyle = A.sel === type ? '#6a8a4a' : '#3e5a2a'; ctx.fill();
+        const x = px + 36 + (i % 5) * 118, y = py + 150 + Math.floor(i / 5) * 126;
+        Art.rrect(ctx, x, y, 110, 118, 14); ctx.fillStyle = A.sel === type ? '#6a8a4a' : '#3e5a2a'; ctx.fill();
         ctx.lineWidth = A.sel === type ? 4 : 3; ctx.strokeStyle = A.sel === type ? '#ffe48a' : '#1e1408'; ctx.stroke();
-        ctx.save(); Art.rrect(ctx, x, y, 134, 138, 14); ctx.clip();
-        ctx.translate(x + 74, y + 68); const hs = type === 'gargantuar' ? 0.75 : 0.95; ctx.scale(hs, hs);
+        ctx.save(); Art.rrect(ctx, x, y, 110, 118, 14); ctx.clip();
+        ctx.translate(x + 60, y + 58); const hs = (type === 'gargantuar' || type === 'archdemon') ? 0.6 : 0.78; ctx.scale(hs, hs);
         Art.zombieHead(ctx, { type, armor: 1, armorMax: 1, look: null }, true);
         ctx.restore();
-        UI.text(ctx, ZOMBIES[type].name.replace('Zombi ', ''), x + 67, y + 124, 15, { fill: '#fff', stroke: '#1e1408', lw: 4, font: UI.BODY, weight: 'bold' });
-        UI.region(x, y, 134, 138, () => { A.sel = type; A.z = null; Sfx.play('select'); });
+        UI.text(ctx, ZOMBIES[type].name.replace('Zombi ', ''), x + 55, y + 106, 13, { fill: '#fff', stroke: '#1e1408', lw: 4, font: UI.BODY, weight: 'bold' });
+        UI.region(x, y, 110, 118, () => { A.sel = type; A.z = null; Sfx.play('select'); });
       });
     }
     const fx = px + 660, fy = py + 30, fw = 820, fh = 780;
@@ -335,14 +350,14 @@ const App = {
       if (!A.z || A.z.type !== A.sel) A.z = { type: A.sel, look: Art.zombieLook(A.sel, 0.5), animT: 0, state: 'walk', armor: 1, armorMax: 1, hasPole: true, hasImp: true, impLook: Art.zombieLook('imp') };
       A.z.animT += 1 / 60;
       A.z.state = A.sel === 'balloon' ? 'fly' : 'walk';
-      const big = A.sel === 'gargantuar' ? 0.95 : A.sel === 'imp' ? 2.6 : A.sel === 'balloon' ? 1.45 : 1.9;
+      const big = (A.sel === 'gargantuar' || A.sel === 'archdemon') ? 0.95 : A.sel === 'imp' ? 2.6 : A.sel === 'balloon' ? 1.45 : 1.9;
       ctx.translate(fx + fw / 2 + 40, fy + 455 - (A.sel === 'balloon' ? 40 : 0)); Art.shadow(ctx, 0, 0, 70, 16); ctx.scale(big, big);
       Art.zombie(ctx, A.z, t);
     }
     ctx.restore();
     if (A.tab === 'plants') {
       const d = PLANTS[A.sel];
-      const tag = d.origin === 'new' ? '¡Nueva! Inventada para este juego' : d.origin === 2 ? 'Planta de la secuela' : 'Planta clásica';
+      const tag = d.origin === 'gothic' ? 'Reino Gótico · habilidad única' : d.origin === 'new' ? '¡Nueva! Inventada para este juego' : d.origin === 2 ? 'Planta de la secuela' : 'Planta clásica';
       UI.text(ctx, d.name, fx + fw / 2, fy + 520, 48, { fill: '#ffe48a', stroke: '#3a1e05', lw: 8 });
       UI.text(ctx, tag, fx + fw / 2, fy + 562, 20, { fill: '#a8e070', stroke: null, font: UI.BODY, weight: 'bold' });
       UI.text(ctx, d.desc, fx + fw / 2, fy + 610, 23, { fill: '#f4ecd0', stroke: null, font: UI.BODY, weight: 'bold' });

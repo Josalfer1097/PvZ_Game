@@ -82,8 +82,10 @@ const UI = {
   packet(ctx, x, y, type, t, o = {}) {
     const w = 84, h = 116;
     ctx.save();
+    if (o.hover) y -= 4;
     if (o.selected) ctx.globalAlpha = 0.55;
     ctx.drawImage(this.packetImage(type, o.premium), x, y, w, h);
+    if (o.ready > 0) { ctx.save(); Art.rrect(ctx, x, y, w, h, 9); ctx.fillStyle = `rgba(255,255,220,${o.ready})`; ctx.fill(); ctx.restore(); }
     if (o.cd > 0) {
       ctx.save(); Art.rrect(ctx, x, y, w, h, 9); ctx.clip();
       ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x, y, w, h * o.cd);
@@ -98,10 +100,13 @@ const UI = {
   },
   packetBase(ctx, type, premium) {
     const x = 0, y = 0, w = 84, h = 116;
+    const goth = PLANTS[type] && PLANTS[type].origin === 'gothic';
     Art.rrect(ctx, x + 1.5, y + 1.5, w - 3, h - 3, 9);
-    const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#fbf6d8'); g.addColorStop(1, '#d6c789');
-    ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#4c6a1c'; ctx.stroke();
-    Art.rrect(ctx, x + 5, y + 5, w - 10, h - 36, 6); ctx.fillStyle = 'rgba(120,180,70,0.22)'; ctx.fill();
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    if (goth) { g.addColorStop(0, '#4a2048'); g.addColorStop(1, '#14060f'); } else { g.addColorStop(0, '#fbf6d8'); g.addColorStop(1, '#d6c789'); }
+    ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = goth ? '#b0203a' : '#4c6a1c'; ctx.stroke();
+    Art.rrect(ctx, x + 5, y + 5, w - 10, h - 36, 6); ctx.fillStyle = goth ? 'rgba(160,30,80,0.25)' : 'rgba(120,180,70,0.22)'; ctx.fill();
+    if (goth) { ctx.strokeStyle = 'rgba(230,180,90,0.6)'; ctx.lineWidth = 1.2; Art.rrect(ctx, x + 4, y + 4, w - 8, h - 8, 7); ctx.stroke(); }
     ctx.save();
     Art.rrect(ctx, x + 3, y + 3, w - 6, h - 32, 6); ctx.clip();
     const tall = { tallnut: 0.42, threepeater: 0.46, chomper: 0.44, jalapeno: 0.5, gatling: 0.5, twinsunflower: 0.5, torchwood: 0.48, melonpult: 0.5, wintermelon: 0.5, magnet: 0.5, doomshroom: 0.5, iceshroom: 0.54, garlic: 0.6, spikeweed: 0.7 }[type] || 0.56;

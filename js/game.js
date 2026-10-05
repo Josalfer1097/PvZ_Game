@@ -9,8 +9,9 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 const BAR = { x: 10, y: 6, sunW: 104, pw: 84, ph: 116, gap: 6 };
 const MIN_WAVE = { normal: 1, flag: 1, cone: 2, mummy: 1, pole: 3, paper: 3, imp: 3, balloon: 3, bucket: 4, screendoor: 4,
-  knight: 5, pharaoh: 5, football: 6, gargantuar: 8 };
-const STAGE_CYCLE = ['day', 'dusk', 'night', 'egypt'];
+  knight: 5, pharaoh: 5, football: 6, gargantuar: 8,
+  skeleton: 1, vampire: 2, witch: 3, ghost: 3, gargoylez: 4, archdemon: 7 };
+const STAGE_CYCLE = ['day', 'dusk', 'night', 'egypt', 'gothic'];
 const LOB_SPEC = {
   melonpult: { kind: 'melon', dmg: 80, splash: 26 }, wintermelon: { kind: 'winter', dmg: 80, splash: 26, slow: true },
   kernelpult: { kind: 'kernel', dmg: 20, splash: 0 }, cabbagepult: { kind: 'cabbage', dmg: 40, splash: 0 },
@@ -31,7 +32,7 @@ class Game {
     this.sun = this.L.startSun != null ? this.L.startSun : this.mode === 'laststand' ? 5000 : STAGES[this.stage].startSun;
     this.grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
     this.plants = []; this.zombies = []; this.peas = []; this.lobs = []; this.shots = []; this.suns = []; this.parts = [];
-    this.craters = []; this.tombs = []; this.rollers = []; this.belt = [];
+    this.craters = []; this.tombs = []; this.rollers = []; this.belt = []; this.patches = [];
     this.mowers = ALL_LANES.map(r => ({ row: r, x: MOWER_X, state: 'idle' }));
     this.time = 0; this.phaseT = 0;
     this.wave = 0; this.waveClock = 0; this.nextWaveAt = 20; this.waveHp = 1;
@@ -44,7 +45,7 @@ class Game {
     this.stats = { killed: 0, planted: 0, sun: 0 };
     this.slots = SLOTS;
     this.owned = PLANT_ORDER.slice();
-    this.chosen = ((Save.data.pick || DEFAULT_PICK).filter(p => PLANTS[p])).slice(0, this.slots);
+    this.chosen = ((this.L.stage === 'gothic' ? GOTHIC_PICK : (Save.data.pick || DEFAULT_PICK)).filter(p => PLANTS[p])).slice(0, this.slots);
     this.packets = [];
     // niebla
     this.fogCols = (STAGES[this.stage].fog && !this.L.noFog) ? STAGES[this.stage].fog : 0;
@@ -81,8 +82,9 @@ class Game {
   makeAmbient() {
     this.ambient = [];
     const st = this.stage;
-    const kind = st === 'night' || st === 'fog' ? 'firefly' : st === 'dusk' ? 'leaf' : st === 'egypt' ? 'sand' : 'butterfly';
-    const n = kind === 'firefly' ? 16 : kind === 'leaf' ? 10 : kind === 'sand' ? 26 : 5;
+    const kind = st === 'night' || st === 'fog' ? 'firefly' : st === 'dusk' ? 'leaf' : st === 'egypt' ? 'sand' : st === 'gothic' ? 'bat' : 'butterfly';
+    const n = kind === 'firefly' ? 16 : kind === 'leaf' ? 10 : kind === 'sand' ? 26 : kind === 'bat' ? 7 : 5;
+    if (kind === 'bat') for (let i = 0; i < 14; i++) this.ambient.push({ kind: 'ember', x: rand(GRID_X, LAWN_RIGHT), y: rand(GRID_Y, H), vx: rand(-10, 10), vy: rand(-30, -10), seed: rand(0, 10) });
     for (let i = 0; i < n; i++) {
       this.ambient.push({
         kind, x: rand(GRID_X, LAWN_RIGHT), y: rand(GRID_Y, H - 40), vx: rand(-20, 20), vy: rand(-10, 10), seed: rand(0, 10),
@@ -90,6 +92,7 @@ class Game {
       });
     }
   }
+  isGiant(z) { return z.type === 'gargantuar' || z.type === 'archdemon'; }
   setStage(stage) {
     if (this.stage === stage) return;
     this.stage = stage;
@@ -152,7 +155,7 @@ class Game {
           this.suns.push({ x: rand(GRID_X + 50, LAWN_RIGHT - 60), y: -40, ty: rowGroundY(lane) - rand(20, 70), vy: 75, vx: 0, value: 25, state: 'fall', life: 0, t: rand(0, 9) });
         }
       }
-      for (const p of this.packets) if (p.cd > 0) p.cd = Math.max(0, p.cd - dt);
+      for (const p of this.packets) { if (p.cd > 0) { p.cd = Math.max(0, p.cd - dt); if (p.cd === 0) p.ready = 0.6; } else if (p.ready > 0) p.ready -= dt; }
       if (this.usesBelt) this.updateBelt(dt);
       this.groanT -= dt;
       if (this.groanT <= 0) { this.groanT = rand(4, 9); if (this.zombies.some(z => z.state !== 'dying')) Sfx.play('groan'); }
@@ -172,13 +175,20 @@ class Game {
     this.updateParts(dt);
     this.updateAmbient(dt);
     this.updateFog(dt);
+    for (const f of this.patches) {
+      f.t -= dt; f.tick -= dt;
+      if (f.tick <= 0) { f.tick = 0.5; for (const z of this.rowZombies(f.row)) if (Math.abs(z.x - f.x) < 50) this.hitZombie(z, 8, 'ground'); }
+      if (Math.random() < 0.4) this.addPart({ kind: 'fire', x: f.x + rand(-40, 40), y: rowGroundY(f.row) - rand(0, 20), vx: 0, vy: rand(-60, -20), life: 0.5, size: rand(10, 18) });
+    }
+    this.patches = this.patches.filter(f => f.t > 0);
     if (this.reward) { this.reward.t += dt; if (this.reward.collected) this.reward.ct += dt; }
     if (this.phase === 'play') this.checkEnd();
   }
 
   updateAmbient(dt) {
     for (const a of this.ambient) {
-      if (a.kind === 'leaf') { a.vx = 25 + Math.sin(this.time + a.seed) * 15; a.vy = 30; }
+      if (a.kind === 'ember') { a.vy = -20 - Math.sin(this.time + a.seed) * 10; a.vx = Math.sin(this.time * 0.7 + a.seed) * 15; if (a.y < GRID_Y - 40) a.y = H; }
+      else if (a.kind === 'leaf') { a.vx = 25 + Math.sin(this.time + a.seed) * 15; a.vy = 30; }
       else if (a.kind === 'sand') { a.vx = 90 + Math.sin(this.time * 2 + a.seed) * 30; a.vy = Math.sin(this.time * 3 + a.seed) * 15; }
       else { a.vx += rand(-60, 60) * dt; a.vy += rand(-60, 60) * dt; a.vx = clamp(a.vx, -35, 35); a.vy = clamp(a.vy, -25, 25); }
       a.x += a.vx * dt; a.y += a.vy * dt;
@@ -270,7 +280,7 @@ class Game {
       const cand = allowed.filter(t => ZOMBIES[t].cost <= budget);
       if (!cand.length) break;
       const weighted = [];
-      for (const t of cand) { const wt = t === 'normal' || t === 'mummy' ? 4 : t === 'football' || t === 'gargantuar' ? 1 : 2; for (let k = 0; k < wt; k++) weighted.push(t); }
+      for (const t of cand) { const wt = t === 'normal' || t === 'mummy' ? 4 : t === 'football' || t === 'gargantuar' || t === 'archdemon' ? 1 : 2; for (let k = 0; k < wt; k++) weighted.push(t); }
       const t = pick(weighted);
       list.push(t); budget -= ZOMBIES[t].cost;
     }
@@ -299,6 +309,11 @@ class Game {
       hasImp: type === 'gargantuar', impLook: Art.zombieLook('imp'), smashK: 0, garlicT: 0, fly: 0,
     };
     if (extra) Object.assign(z, extra);
+    else if (this.stage === 'gothic' && this.tombs.some(k => k.c >= 5) && Math.random() < 0.3 && !this.isGiant(z)) {
+      const tb = pick(this.tombs.filter(k => k.c >= 5));
+      z.row = tb.r; z.y = rowGroundY(tb.r) + 6; z.x = cellCX(tb.c) - 34; z.state = 'rise'; z.riseT = 0;
+      this.dirtBurst(z.x, z.y, 12, 1);
+    }
     this.zombies.push(z);
     return z;
   }
@@ -317,7 +332,7 @@ class Game {
   }
 
   // ---------------- Plantas ----------------
-  alive(z) { return z.state !== 'dying' && !z.removed && z.state !== 'thrown'; }
+  alive(z) { return z.state !== 'dying' && !z.removed && z.state !== 'thrown' && z.state !== 'bones' && z.state !== 'rise' && !z.charmed; }
   rowZombies(row) { return this.zombies.filter(z => z.row === row && this.alive(z)); }
   ground(z) { return this.alive(z) && !this.isFlying(z); }
   zombieAhead(row, x, maxX = ZOMBIE_VISIBLE_X) {
@@ -345,9 +360,24 @@ class Game {
     for (let i = 0; i < 10; i++) this.addPart({ kind: 'dirt', x: p.x + rand(-30, 30), y: p.y, vx: rand(-80, 80), vy: rand(-200, -80), g: 600, life: 0.6, size: rand(3, 6), ground: p.y + 4 });
     return p;
   }
-  removePlant(p) {
+  removePlant(p, anim = true) {
+    if (p.dead) return;
     p.dead = true;
     if (this.grid[p.row][p.col] === p) this.grid[p.row][p.col] = null;
+    if (anim && p.kind !== 'instant' && p.kind !== 'mine' && p.kind !== 'trap' && p.type !== 'squash') {
+      this.addPart({ kind: 'plantdie', type: p.type, x: p.x, y: p.y, life: 0.5, seed: p.seed });
+      for (let i = 0; i < 8; i++) this.addPart({ kind: 'splat', x: p.x + rand(-20, 20), y: p.y - rand(20, 70), vx: rand(-120, 120), vy: rand(-200, -40), g: 600, life: 0.6, size: rand(3, 6), color: '90,160,50' });
+    }
+  }
+  // Una planta destruida por un zombi (come o aplasta)
+  plantKilled(p) {
+    this.removePlant(p);
+    if (p.type === 'cursedpumpkin') {
+      for (const z of this.zombies) if (this.alive(z) && Math.abs(z.row - p.row) <= 1 && Math.abs(z.x - p.x) < COL_W * 1.5 + 30) this.blast(z, 1800);
+      this.boom(p.x, p.y - 40, 1.1);
+      this.addPart({ kind: 'text', x: p.x, y: p.y - 120, life: 1.2, text: '¡MALDICIÓN!', size: 46, vy: -20, color: '#ff8a20' });
+      Sfx.play('explode'); this.shake = 0.5;
+    }
   }
 
   updatePlant(p, dt) {
@@ -356,6 +386,8 @@ class Game {
     if (p.flash > 0) p.flash -= dt;
     if (p.attack > 0) p.attack = Math.max(0, p.attack - dt * 3);
     if (p.springT > 0) p.springT -= dt;
+    if (p.soulCD > 0) p.soulCD -= dt;
+    if (p.hexed > 0) { p.hexed -= dt; return; }
     const T = p.type;
     switch (p.kind) {
       case 'shooter': {
@@ -366,8 +398,8 @@ class Game {
         if (T === 'threepeater') rows = [p.row - 1, p.row, p.row + 1].filter(r => this.lanes.includes(r));
         const target = rows.some(r => this.zombieAhead(r, p.x));
         if (p.fireT <= 0 && target) {
-          p.fireT = 1.4; p.recoil = 1;
-          const kind = T === 'snowpea' ? 'snow' : T === 'firepea' ? 'fire' : T === 'thornrose' ? 'thorn' : 'pea';
+          p.fireT = T === 'fallenangel' ? 1.5 : T === 'demon' ? 1.5 : 1.4; p.recoil = 1;
+          const kind = T === 'snowpea' ? 'snow' : T === 'firepea' ? 'fire' : T === 'thornrose' ? 'thorn' : T === 'demon' ? 'hellfire' : T === 'fallenangel' ? 'feather' : T === 'ghostlily' ? 'wisp' : 'pea';
           if (T === 'threepeater') rows.forEach(r => this.firePea(p, r, 'pea'));
           else {
             this.firePea(p, p.row, kind);
@@ -395,7 +427,7 @@ class Game {
         p.glow = clamp(1 - p.sunT, 0, 1);
         if (p.sunT <= 0) {
           const moon = T === 'moonflower';
-          p.sunT = moon ? rand(17, 19) : rand(23, 25);
+          p.sunT = moon ? rand(17, 19) : T === 'bloodrose' ? rand(20, 22) : rand(23, 25);
           const dark = this.stage === 'night' || this.stage === 'fog';
           const n = T === 'twinsunflower' || (moon && dark) ? 2 : 1;
           for (let k = 0; k < n; k++)
@@ -436,7 +468,7 @@ class Game {
         break;
       }
       case 'trap': {
-        const hit = this.rowZombies(p.row).find(z => this.ground(z) && z.x - p.x > -30 && z.x - p.x < 55 && z.state !== 'jump' && z.type !== 'gargantuar');
+        const hit = this.rowZombies(p.row).find(z => this.ground(z) && z.x - p.x > -30 && z.x - p.x < 55 && z.state !== 'jump' && !this.isGiant(z));
         if (hit) {
           hit.frozen = 10; hit.slow = Math.max(hit.slow, 18);
           for (let i = 0; i < 16; i++) this.addPart({ kind: 'snowflake', x: hit.x + rand(-40, 40), y: hit.y - rand(0, 150), vx: rand(-40, 40), vy: rand(-60, 20), life: 1, size: rand(3, 6), rot: 0, vr: 2 });
@@ -542,6 +574,61 @@ class Game {
         }
         break;
       }
+      case 'charm': {
+        p.fireT -= dt;
+        if (p.fireT <= 0) {
+          let best = null;
+          for (const z of this.rowZombies(p.row)) if (!this.isGiant(z) && z.x > p.x && z.x < Math.min(ZOMBIE_VISIBLE_X, p.x + COL_W * 5) && (!best || z.x < best.x)) best = z;
+          if (best) { p.fireT = 8; p.attack = 1; this.shots.push({ kind: 'heart', x: p.x + 30, y: p.y - 70, row: p.row, vx: 0, vy: 0, target: best }); Sfx.play('reward'); }
+          else p.fireT = 0;
+        }
+        break;
+      }
+      case 'drain': {
+        p.fireT -= dt;
+        if (p.fireT <= 0) {
+          p.fireT = 1;
+          const R = COL_W * 1.7;
+          const hits = this.zombies.filter(z => this.alive(z) && Math.hypot(z.x - p.x, (z.row - p.row) * ROW_H) < R);
+          if (hits.length) {
+            p.attack = 1;
+            hits.forEach(z => { this.hitZombie(z, 35, 'lob'); this.addPart({ kind: 'drain', x: z.x, y: z.y - 90, tx: p.x, ty: p.y - 88, life: 0.6 }); });
+            for (const q of this.plants) if (!q.dead && Math.hypot(q.x - p.x, (q.row - p.row) * ROW_H) < R) q.hp = Math.min(q.maxHp, q.hp + 25 * hits.length);
+          }
+        }
+        break;
+      }
+      case 'reaper': {
+        p.fireT -= dt;
+        if (p.fireT <= 0) {
+          const hits = this.zombies.filter(z => this.alive(z) && Math.abs(z.row - p.row) <= 1 && z.x - p.x > -30 && z.x - p.x < COL_W * 1.7);
+          if (hits.length) {
+            p.fireT = 2.5; p.attack = 1; Sfx.play('smash');
+            for (const z of hits) {
+              const full = z.maxHp + (ZOMBIES[z.type].armor || 0);
+              if (z.hp + z.armor <= full * 0.45 && !this.isGiant(z)) {
+                this.killZombie(z, false);
+                this.addPart({ kind: 'text', x: z.x, y: z.y - 170, life: 1, text: '¡Cosecha!', size: 30, vy: -40, color: '#d8b0ff' });
+                this.soulSun(z.x, z.y - 80);
+              } else this.hitZombie(z, 80, 'explosion');
+            }
+            this.addPart({ kind: 'slash', x: p.x + 40, y: p.y - 60, life: 0.35 });
+          } else p.fireT = 0;
+        }
+        break;
+      }
+      case 'web': {
+        p.fireT -= dt;
+        if (p.fireT <= 0) {
+          const hits = this.rowZombies(p.row).filter(z => z.x - p.x > -10 && z.x - p.x < COL_W * 3.5 && z.x < ZOMBIE_VISIBLE_X);
+          if (hits.length) {
+            p.fireT = 2; p.attack = 1;
+            hits.forEach(z => { z.webT = 4; z.slow = Math.max(z.slow, 4); this.hitZombie(z, 15, 'ground'); });
+            this.addPart({ kind: 'beam', x: p.x + 20, y: p.y - 60, x2: hits[hits.length - 1].x, y2: p.y - 50, life: 0.3, color: '230,230,240' });
+          } else p.fireT = 0;
+        }
+        break;
+      }
       case 'aura': {
         p.fireT -= dt;
         if (p.fireT <= 0) {
@@ -562,7 +649,7 @@ class Game {
 
   updateChomper(p, dt) {
     if (p.mode === 'idle') {
-      const cands = this.rowZombies(p.row).filter(z => this.ground(z) && z.x - p.x > -25 && z.x - p.x < 165 && z.state !== 'jump' && z.x < ZOMBIE_VISIBLE_X && z.type !== 'gargantuar');
+      const cands = this.rowZombies(p.row).filter(z => this.ground(z) && z.x - p.x > -25 && z.x - p.x < 165 && z.state !== 'jump' && z.x < ZOMBIE_VISIBLE_X && !this.isGiant(z));
       if (cands.length) { p.mode = 'bite'; p.biteT = 0; p.target = cands.reduce((a, b) => a.x < b.x ? a : b); }
     } else if (p.mode === 'bite') {
       const prev = p.biteT;
@@ -633,9 +720,10 @@ class Game {
   }
 
   firePea(p, row, kind) {
-    this.peas.push({ x: p.x + 42, y: p.y - 64, ty: rowGroundY(row) - 64, row, kind, dmg: kind === 'fire' ? 40 : 20, dead: false,
-      torched: new Set(), pierce: kind === 'thorn' ? 3 : 1, hit: new Set() });
-    Sfx.play(kind === 'fire' ? 'firepea' : 'shoot');
+    const dmg = { fire: 40, hellfire: 40, feather: 30, wisp: 30 }[kind] || 20;
+    this.peas.push({ x: p.x + 42, y: p.y - 64 - (kind === 'wisp' ? 10 : 0), ty: rowGroundY(row) - 64, row, kind, dmg, dead: false,
+      torched: new Set(), pierce: kind === 'thorn' ? 3 : kind === 'feather' ? 99 : 1, hit: new Set(), trail: [] });
+    Sfx.play(kind === 'fire' || kind === 'hellfire' ? 'firepea' : kind === 'wisp' ? 'freeze' : 'shoot');
   }
   lobTarget(p) {
     let best = null;
@@ -717,7 +805,7 @@ class Game {
   }
   hurricane(p) {
     for (const z of this.rowZombies(p.row)) {
-      if (z.type === 'gargantuar') { z.x = Math.min(ZOMBIE_VISIBLE_X - 10, z.x + 120); continue; }
+      if (this.isGiant(z)) { z.x = Math.min(ZOMBIE_VISIBLE_X - 10, z.x + 120); continue; }
       z.x = Math.min(ZOMBIE_VISIBLE_X + 60, z.x + COL_W * 2.2); z.frozen = 0; z.stunT = 0.6;
     }
     for (let i = 0; i < 30; i++) this.addPart({ kind: 'wind', x: p.x + rand(0, 900), y: p.y - rand(10, 120), vx: rand(500, 800), life: rand(0.4, 0.7), size: rand(30, 60) });
@@ -725,6 +813,7 @@ class Game {
   }
   boom(x, y, s) {
     this.addPart({ kind: 'flash', x, y, life: 0.5, size: 260 * s, color: '255,200,80' });
+    this.addPart({ kind: 'ring', x, y: y + 30, life: 0.55, size: 200 * s });
     for (let i = 0; i < 40 * s; i++) {
       const a = rand(0, Math.PI * 2), sp = rand(100, 520) * Math.sqrt(s);
       this.addPart({ kind: 'fire', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.7 - 60, g: 120, life: rand(0.5, 1), size: rand(14, 30) * Math.sqrt(s) });
@@ -739,7 +828,7 @@ class Game {
     z.flash = 0.1;
     if (kind === 'pea') z.hitT = 0.12;
     const def = ZOMBIES[z.type];
-    const bypass = def.shield && (kind === 'lob' || kind === 'ground');
+    const bypass = kind === 'true' || (def.shield && (kind === 'lob' || kind === 'ground'));
     if (z.armor > 0 && !bypass) {
       Sfx.play(def.metal ? 'clank' : z.type === 'cone' ? 'plastic' : 'splat');
       z.armor -= dmg;
@@ -774,12 +863,18 @@ class Game {
   }
   killZombie(z, squash) {
     if (z.state === 'dying') return;
+    if (z.type === 'skeleton' && !squash && !z.revived && !z.charmed) {
+      z.state = 'bones'; z.reviveT = 0; z.revived = true; z.hp = 1; z.armor = 0; z.frozen = 0;
+      Sfx.play('thud'); this.addPart({ kind: 'text', x: z.x, y: z.y - 120, life: 0.9, text: '¡Crac!', size: 28, vy: -30, color: '#f0e8d0' });
+      return;
+    }
+    for (const r of this.plants) if (r.type === 'bloodrose' && !r.dead && !(r.soulCD > 0) && Math.hypot(r.x - z.x, (r.row - z.row) * ROW_H) < COL_W * 2.6) { r.soulCD = 1.5; this.soulSun(r.x, r.y - 80); }
     z.state = 'dying'; z.dieT = 0; z.hp = 0; z.armor = 0; z.squashed = squash; z.frozen = 0;
     this.lastDeath = { x: z.x, y: z.y };
     this.stats.killed++;
     if (!squash) {
       z.headless = true;
-      this.addPart({ kind: 'head', data: { type: z.type, look: z.look, enraged: z.enraged }, x: z.x - 20, y: z.y - (z.type === 'gargantuar' ? 230 : z.type === 'imp' ? 100 : 150),
+      this.addPart({ kind: 'head', data: { type: z.type, look: z.look, enraged: z.enraged }, x: z.x - 20, y: z.y - (this.isGiant(z) ? 230 : z.type === 'imp' ? 100 : 150),
         vx: rand(20, 90), vy: -200, g: 900, life: 2, rot: 0, vr: rand(3, 7), ground: z.y - 16 });
     }
   }
@@ -799,7 +894,7 @@ class Game {
       z.dieT += dt;
       if (z.burnt && z.dieT > 0.7 && !z.ashed) {
         z.ashed = true;
-        const s = z.type === 'gargantuar' ? 1.7 : 1;
+        const s = this.isGiant(z) ? 1.7 : 1;
         for (let i = 0; i < 18 * s; i++) this.addPart({ kind: 'ash', x: z.x + rand(-25, 25) * s, y: z.y - rand(0, 150) * s, vx: rand(-30, 30), vy: rand(-30, 30), g: 300, life: rand(0.6, 1.2), size: rand(3, 7), ground: z.y });
       }
       if (!z.burnt && !z.squashed && prev < 0.85 && z.dieT >= 0.85) {
@@ -809,6 +904,11 @@ class Game {
       if (z.dieT > (z.burnt ? 1.4 : 2.6)) z.removed = true;
       return;
     }
+    if (z.state === 'rise') { z.riseT += dt / 1.3; if (z.riseT >= 1) z.state = 'walk'; return; }
+    if (z.state === 'bones') { z.reviveT += dt; if (z.reviveT >= 3) { z.state = 'walk'; z.hp = Math.round(z.maxHp * 0.6); z.headless = false; Sfx.play('groan'); } return; }
+    if (z.webT > 0) z.webT -= dt;
+    if (z.castT > 0) z.castT -= dt;
+    if (z.type === 'ghost') { z.phaseT = (z.phaseT || 0) + dt; z.ethereal = (z.phaseT % 4.6) > 2.8; }
     if (z.state === 'blown') { z.x += z.vx * dt; z.animT += dt; if (z.x > W + 200) z.removed = true; return; }
     if (z.state === 'thrown') {
       z.flyT += dt / 1.0;
@@ -818,7 +918,8 @@ class Game {
       if (z.flyT >= 1) { z.lift = 0; z.state = 'walk'; z.stunT = 0.4; Sfx.play('thud'); }
       return;
     }
-    if (z.frozen > 0) { z.frozen -= dt; return; }
+    if (z.frozen > 0) { z.frozen -= dt; if (z.frozen <= 0) z.stone = 0; return; }
+    if (z.charmed) { this.updateCharmed(z, dt); return; }
     const slowMul = z.slow > 0 ? 0.5 : 1;
     if (z.slow > 0) z.slow -= dt;
     z.animT += dt * slowMul * (this.mode === 'rush' ? 1.6 : 1);
@@ -841,13 +942,13 @@ class Game {
       if (z.jumpT >= 1) { z.state = 'walk'; z.hasPole = false; z.stunT = 0.25; }
       return;
     }
-    if (z.type === 'gargantuar') {
+    if (this.isGiant(z)) {
       if (z.state === 'smash') {
         const prev = z.smashK;
         z.smashK += dt * slowMul / 1.4;
         if (prev < 0.68 && z.smashK >= 0.68) {
           const tgt = z.smashTarget;
-          if (tgt && !tgt.dead) this.removePlant(tgt);
+          if (tgt && !tgt.dead) { this.plantKilled(tgt); if (z.type === 'archdemon') for (let i = 0; i < 12; i++) this.addPart({ kind: 'fire', x: tgt.x + rand(-30, 30), y: tgt.y - rand(0, 60), vx: rand(-40, 40), vy: rand(-140, -40), life: 0.8, size: rand(16, 28) }); }
           this.shake = 0.3; Sfx.play('smash');
           this.dirtBurst(z.x - 90, z.y, 14, 1.2);
         }
@@ -868,17 +969,39 @@ class Game {
       }
       if (z.hasImp && z.hp < z.maxHp / 2 && z.x > GRID_X + COL_W * 4 && z.x < ZOMBIE_VISIBLE_X) { z.state = 'throw'; z.throwK = 0; return; }
     }
+    if (z.type === 'archdemon' && !z.summoned && z.hp < z.maxHp / 2 && z.x < ZOMBIE_VISIBLE_X) {
+      z.summoned = true;
+      for (const dr of [-1, 1]) { const r = z.row + dr; if (r >= 0 && r < ROWS) { const s2 = this.spawnZombie('skeleton', r, z.x - 30, { state: 'rise', riseT: 0 }); s2.y = rowGroundY(r) + 6; } }
+      this.addPart({ kind: 'flash', x: z.x, y: z.y - 100, life: 0.6, size: 200, color: '255,60,30' }); Sfx.play('siren');
+    }
+    if (z.type === 'witch') {
+      z.spellT = (z.spellT || 3) - dt;
+      if (z.spellT <= 0) {
+        const vic = this.plants.find(q => !q.dead && q.row === z.row && z.x - q.x > 30 && z.x - q.x < COL_W * 3.2 && !(q.hexed > 0) && z.x < ZOMBIE_VISIBLE_X);
+        if (vic) {
+          z.spellT = 7; z.castT = 1; vic.hexed = 5;
+          for (let i = 0; i < 14; i++) this.addPart({ kind: 'spark', x: vic.x + rand(-30, 30), y: vic.y - rand(10, 100), vx: rand(-40, 40), vy: rand(-80, -10), life: 0.8, size: rand(3, 6), color: '140,255,90' });
+          Sfx.play('magnet');
+        } else z.spellT = 1;
+      }
+    }
+    const cz = this.zombies.find(c => c.charmed && c.row === z.row && c.state !== 'dying' && z.x - c.x > -20 && z.x - c.x < 58);
+    if (cz) {
+      z.state = 'eat'; z.eatT -= dt;
+      if (z.eatT <= 0) { z.eatT = 0.45; cz.hp -= 45; cz.flash = 0.1; Sfx.play('chomp'); if (cz.hp <= 0) this.killZombie(cz, false); }
+      return;
+    }
     // planta delante
     let target = null;
-    const reach = z.type === 'gargantuar' ? 95 : z.hasPole ? 90 : 58;
+    const reach = this.isGiant(z) ? 95 : z.hasPole ? 90 : 58;
     for (const p of this.plants) {
       if (p.row !== z.row || p.dead || p.untargetable) continue;
-      if (p.kind === 'spike' && z.type !== 'gargantuar') continue;
+      if (p.kind === 'spike' && !this.isGiant(z)) continue;
       const d = z.x - p.x;
       if (d > -20 && d < reach && (!target || p.x > target.x)) target = p;
     }
-    if (target && (target.kind === 'mine' && target.armed || target.kind === 'trap') && z.type !== 'gargantuar') target = null;
-    if (target && z.type === 'gargantuar') { z.state = 'smash'; z.smashK = 0; z.smashTarget = target; return; }
+    if (target && (target.kind === 'mine' && target.armed || target.kind === 'trap') && !this.isGiant(z)) target = null;
+    if (target && this.isGiant(z)) { z.state = 'smash'; z.smashK = 0; z.smashTarget = target; return; }
     if (target && z.hasPole) {
       if (target.type === 'tallnut') { z.hasPole = false; this.addPart({ kind: 'pole', x: z.x, y: z.y - 80, vx: 60, vy: -100, g: 600, life: 1.2, rot: 0, vr: 3, ground: z.y - 4 }); }
       else { z.state = 'jump'; z.jumpT = 0; z.jumpFrom = z.x; z.jumpTo = target.x - 72; Sfx.play('plastic'); return; }
@@ -896,13 +1019,18 @@ class Game {
       target.flash = 0.05;
       z.eatT -= dt;
       if (z.eatT <= 0) { z.eatT = 0.45 / slowMul; Sfx.play('chomp'); if (target.type === 'endurian') this.hitZombie(z, 10, 'ground'); }
+      if (z.type === 'vampire') z.hp = Math.min(z.maxHp, z.hp + EAT_DPS * 0.6 * dt);
+      if (target.type === 'gargoyle' && z.eatT === 0.45 / slowMul && Math.random() < 0.15 && !this.isGiant(z)) {
+        z.frozen = 3; z.stone = 3; this.addPart({ kind: 'text', x: z.x, y: z.y - 170, life: 0.9, text: '¡Petrificado!', size: 26, vy: -30, color: '#d8d8d0' });
+      }
       if (target.type === 'garlic') { z.garlicT += dt; if (z.garlicT > 0.45) { z.garlicT = 0; this.divert(z); } }
-      if (target.hp <= 0) { this.removePlant(target); Sfx.play('gulp'); }
+      if (target.hp <= 0) { this.plantKilled(target); Sfx.play('gulp'); }
     } else {
       if (z.state !== 'lane') z.state = 'walk';
       let mul = ZOMBIES[z.type].speed;
       if (z.type === 'pole' && !z.hasPole) mul = 1;
       if (z.enraged) mul = 2.6;
+      if (z.webT > 0) mul *= 0.55;
       z.x -= z.spd * mul * slowMul * Art.stepPulse(z) * dt;
     }
     if (z.state === 'lane') {
@@ -930,7 +1058,7 @@ class Game {
   }
 
   // ---------------- Proyectiles ----------------
-  hitbox(z) { return z.type === 'gargantuar' ? [z.x - 55, z.x + 60] : z.type === 'imp' ? [z.x - 20, z.x + 25] : [z.x - 32, z.x + 40]; }
+  hitbox(z) { return this.isGiant(z) ? [z.x - 60, z.x + 66] : z.type === 'imp' ? [z.x - 20, z.x + 25] : [z.x - 32, z.x + 40]; }
   hitTomb(row, x0, x1, dmg) {
     for (const tb of this.tombs) {
       const tx = cellCX(tb.c) - 28;
@@ -951,6 +1079,7 @@ class Game {
     const torches = this.plants.filter(p => p.type === 'torchwood' && !p.dead);
     for (const pe of this.peas) {
       const ox = pe.x;
+      pe.trail.unshift([pe.x, pe.y]); if (pe.trail.length > 5) pe.trail.pop();
       pe.x += 560 * dt;
       if (pe.y !== pe.ty) { const d = pe.ty - pe.y; pe.y += Math.sign(d) * Math.min(Math.abs(d), 420 * dt); }
       if (pe.x > W + 40) { pe.dead = true; continue; }
@@ -964,7 +1093,7 @@ class Game {
       if (this.tombs.length && this.hitTomb(pe.row, ox, pe.x, pe.dmg)) { pe.dead = true; this.splat(pe); continue; }
       let best = null;
       for (const z of this.zombies) {
-        if (z.row !== pe.row || !this.alive(z) || z.state === 'jump' || pe.hit.has(z)) continue;
+        if (z.row !== pe.row || !this.alive(z) || z.state === 'jump' || pe.hit.has(z) || (z.ethereal && pe.kind !== 'wisp')) continue;
         if (z.x > ZOMBIE_VISIBLE_X + 20) continue;
         const [a, b] = this.hitbox(z);
         if (pe.x > a && pe.x < b && (!best || z.x < best.x)) best = z;
@@ -975,7 +1104,9 @@ class Game {
           best.slow = 0;
           this.hitZombie(best, pe.dmg, 'pea');
           for (const z of this.rowZombies(pe.row)) if (z !== best && Math.abs(z.x - best.x) < 60) this.hitZombie(z, 13, 'explosion');
-        } else this.hitZombie(best, pe.dmg, 'pea', pe.kind === 'snow');
+        } else if (pe.kind === 'wisp') this.hitZombie(best, pe.dmg, 'true');
+        else if (pe.kind === 'hellfire') { this.hitZombie(best, pe.dmg, 'pea'); this.patches.push({ row: pe.row, x: best.x - 10, t: 3, tick: 0 }); }
+        else this.hitZombie(best, pe.dmg, 'pea', pe.kind === 'snow');
         this.splat(pe);
         if (--pe.pierce <= 0) pe.dead = true;
       }
@@ -1011,6 +1142,7 @@ class Game {
   }
   updateShots(dt) {
     for (const s of this.shots) {
+      if (s.kind === 'heart') { this.updateHeart(s, dt); continue; }
       if (s.kind === 'rocket') {
         const tz = s.target && this.alive(s.target) ? s.target : null;
         if (tz) {
@@ -1102,12 +1234,12 @@ class Game {
   updateSuns(dt) {
     for (const s of this.suns) {
       s.t += dt;
-      if (s.state === 'fall') { s.y += s.vy * dt; if (s.y >= s.ty) { s.y = s.ty; s.state = 'ground'; } }
+      if (s.state === 'fall') { s.y += s.vy * dt; if (s.y >= s.ty) { s.y = s.ty; s.state = 'ground'; s.bounce = 0.35; } }
       else if (s.state === 'pop') {
         s.vy += 700 * dt; s.x += s.vx * dt; s.y += s.vy * dt;
-        if (s.vy > 0 && s.y >= s.ty) { s.y = s.ty; s.state = 'ground'; }
+        if (s.vy > 0 && s.y >= s.ty) { s.y = s.ty; s.state = 'ground'; s.bounce = 0.35; }
       } else if (s.state === 'ground') {
-        s.life += dt;
+        s.life += dt; if (s.bounce > 0) s.bounce -= dt;
         if (Save.data.autoSun && s.life > 0.7) this.collectSun(s);
         if (s.life > 10) s.dead = true;
       } else if (s.state === 'fly') {
@@ -1122,6 +1254,9 @@ class Game {
     this.suns = this.suns.filter(s => !s.dead);
     if (this.sunPulse > 0) this.sunPulse -= dt;
   }
+  soulSun(x, y) {
+    this.suns.push({ x, y, ty: y + rand(10, 40), vx: rand(-60, 60), vy: -220, value: 15, state: 'pop', life: 0, t: 0, soul: true });
+  }
   collectSun(s) {
     if (s.state === 'fly') return;
     s.state = 'fly'; Sfx.play('sun');
@@ -1133,7 +1268,7 @@ class Game {
       if (!m || m.state !== 'run') continue;
       m.x += 480 * dt;
       for (const z of this.zombies) {
-        if (z.row === m.row && this.ground(z) && Math.abs(z.x - m.x) < 60 && z.x < ZOMBIE_VISIBLE_X + 40) this.killZombie(z, false);
+        if (z.row === m.row && this.ground(z) && Math.abs(z.x - m.x) < 60 && z.x < ZOMBIE_VISIBLE_X + 40) { z.revived = true; this.killZombie(z, false); }
       }
       if (Math.random() < 0.6) this.addPart({ kind: 'grass', x: m.x - 30, y: rowGroundY(m.row) - 4, vx: rand(-160, -40), vy: rand(-160, -60), g: 500, life: 0.6, size: rand(2, 4) });
       if (m.x > W + 80) m.state = 'gone';
@@ -1245,3 +1380,33 @@ class Game {
     if (k === ' ' && this.phase === 'play') this.paused = true;
   }
 }
+
+// ---------------- Mecánicas góticas ----------------
+Object.assign(Game.prototype, {
+  updateHeart(s, dt) {
+    const z = s.target;
+    if (!z || !this.alive(z)) { s.dead = true; return; }
+    const tx = z.x - 10, ty = z.y - 110;
+    const d = Math.hypot(tx - s.x, ty - s.y);
+    if (d < 26) {
+      s.dead = true;
+      z.charmed = true; z.state = 'walk'; z.slow = 0; z.frozen = 0; z.stunT = 0; z.hasPole = false;
+      this.addPart({ kind: 'text', x: z.x, y: z.y - 190, life: 1.1, text: '¡Hechizado!', size: 30, vy: -30, color: '#ff8ac8' });
+      for (let i = 0; i < 10; i++) this.addPart({ kind: 'heartp', x: z.x + rand(-30, 30), y: z.y - rand(80, 160), vx: rand(-40, 40), vy: rand(-90, -30), life: 1, size: rand(5, 9) });
+      Sfx.play('reward');
+      return;
+    }
+    s.x += (tx - s.x) / d * 520 * dt; s.y += (ty - s.y) / d * 520 * dt;
+  },
+  // Zombi hechizado por la Demonia: camina hacia la derecha y se come a los demás
+  updateCharmed(z, dt) {
+    z.animT += dt;
+    const foe = this.zombies.find(f => f !== z && this.alive(f) && f.row === z.row && f.x - z.x > -10 && f.x - z.x < 62);
+    if (foe) {
+      z.state = 'eat'; z.eatT -= dt;
+      if (z.eatT <= 0) { z.eatT = 0.4; this.hitZombie(foe, 45, 'explosion'); Sfx.play('chomp'); }
+    } else { z.state = 'walk'; z.x += z.spd * 1.1 * Art.stepPulse(z) * dt; }
+    if (Math.random() < dt * 1.5) this.addPart({ kind: 'heartp', x: z.x, y: z.y - 170, vx: rand(-10, 10), vy: -40, life: 0.8, size: 5 });
+    if (z.x > W + 80) z.removed = true;
+  },
+});
